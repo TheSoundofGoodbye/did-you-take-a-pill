@@ -57,11 +57,11 @@ extension DoseTimeExtension on DoseTime {
   /// 현재 시각 기준으로 가장 가까운 DoseTime 반환.
   static DoseTime fromCurrentTime() {
     final hour = DateTime.now().hour;
-    if (hour >= 4 && hour < 9)  return DoseTime.wakeUp;
-    if (hour >= 9 && hour < 11) return DoseTime.morning;
-    if (hour >= 11 && hour < 17) return DoseTime.afternoon;
-    if (hour >= 17 && hour < 22) return DoseTime.evening;
-    return DoseTime.bedTime;
+    if (hour >= 4  && hour < 8)  return DoseTime.wakeUp;    // 04:00~07:59
+    if (hour >= 8  && hour < 11) return DoseTime.morning;   // 08:00~10:59
+    if (hour >= 11 && hour < 17) return DoseTime.afternoon; // 11:00~16:59
+    if (hour >= 17 && hour < 22) return DoseTime.evening;   // 17:00~21:59
+    return DoseTime.bedTime;                                 // 22:00~03:59
   }
 }
 
