@@ -327,7 +327,7 @@ class _MedicationFormSheet extends StatefulWidget {
 
 class _MedicationFormSheetState extends State<_MedicationFormSheet> {
   late final TextEditingController _nameController;
-  late final TextEditingController _daysController;
+  int _prescriptionDays = 7;
   bool get _isEditMode => widget.medication != null;
 
   late final Map<DoseTime, bool> _selectedTimes;
@@ -342,8 +342,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
     super.initState();
     final med = widget.medication;
     _nameController = TextEditingController(text: med?.name ?? '');
-    _daysController = TextEditingController(
-        text: med != null ? med.totalDays.toString() : '');
+    _prescriptionDays = med?.totalDays ?? 7;
     _selectedTimes = {
       DoseTime.wakeUp:    med?.doseTimes.contains(DoseTime.wakeUp) ?? false,
       DoseTime.morning:   med?.doseTimes.contains(DoseTime.morning) ?? true,
@@ -357,7 +356,6 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
   @override
   void dispose() {
     _nameController.dispose();
-    _daysController.dispose();
     super.dispose();
   }
 
@@ -369,7 +367,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
   }
 
   bool get _hasDays {
-    return (int.tryParse(_daysController.text.trim()) ?? 0) > 0;
+    return _prescriptionDays > 0;
   }
 
   bool get _hasTime {
@@ -509,7 +507,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
     if (!_isValid) return;
     final provider = context.read<MedicationProvider>();
     final name = _nameController.text.trim();
-    final totalDays = int.parse(_daysController.text.trim());
+    final totalDays = _prescriptionDays;
 
     if (_isEditMode) {
       final totalCount = totalDays * _selectedDoseTimes.length;
@@ -555,23 +553,23 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             Text(_isEditMode ? '약 수정' : '약 추가',
                 style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: Colors.white)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
             // ── 사진 등록 영역 ──
             _buildLabel('약 사진 (선택)'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _buildImagePicker(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // 약 이름 (optional - 사진이 있으면 생략 가능)
             _buildLabel('약 이름 (사진이 있으면 생략 가능)'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _buildValidatedTextField(
               controller: _nameController,
               hint: '예: 고혈압약',
@@ -579,21 +577,13 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
               hasError: _showValidationErrors && !_hasNameOrImage,
               errorText: '사진 또는 이름을 입력하세요',
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // 처방 일수
-            _buildLabel('처방 일수'),
+            _buildLabel('처방 일수 (며칠 치 약인가요?)'),
             const SizedBox(height: 8),
-            _buildValidatedTextField(
-              controller: _daysController,
-              hint: '예: 7',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              key: 'medication_days_input',
-              hasError: _showValidationErrors && !_hasDays,
-              errorText: '처방 일수를 입력하세요',
-            ),
-            const SizedBox(height: 20),
+            _buildDaysSelector(),
+            const SizedBox(height: 12),
 
             // 언제 드시는 약인가요? (5개 버튼)
             const Text(
@@ -612,9 +602,9 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
                         fontSize: 14,
                         color: const Color(0xFFFF6B6B).withValues(alpha: 0.9))),
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             _buildDoseTimeButtons(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // 저장 버튼 — 항상 활성, 미입력 시 하이라이트
             ElevatedButton(
@@ -741,6 +731,122 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
     );
   }
 
+  /// 키보드 없이 일수를 조절하는 스텝퍼 + 프리셋 버튼
+  Widget _buildDaysSelector() {
+    Widget buildPresetChip(int days) {
+      final isSelected = _prescriptionDays == days;
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            _prescriptionDays = days;
+            _showValidationErrors = false;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF4ECDC4) : const Color(0xFF2A2A3E),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF4ECDC4) : Colors.white.withValues(alpha: 0.2),
+              width: 1.5,
+            ),
+          ),
+          child: Text('$days일',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? const Color(0xFF0F0F1A) : Colors.white.withValues(alpha: 0.8),
+              )),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: (_showValidationErrors && !_hasDays)
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFFF6B6B).withValues(alpha: 0.8), width: 1.5))
+          : null,
+      padding: (_showValidationErrors && !_hasDays) ? const EdgeInsets.all(6) : EdgeInsets.zero,
+      child: Column(
+        children: [
+          // 1. 대형 스텝퍼 [ - ]  [ 7 일 ]  [ + ]
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildStepperButton(
+                icon: Icons.remove_rounded,
+                onTap: () {
+                  if (_prescriptionDays > 1) {
+                    setState(() {
+                      _prescriptionDays--;
+                      _showValidationErrors = false;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(width: 20),
+              Container(
+                alignment: Alignment.center,
+                width: 70,
+                child: Text(
+                  '$_prescriptionDays 일',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              _buildStepperButton(
+                icon: Icons.add_rounded,
+                onTap: () {
+                  if (_prescriptionDays < 90) {
+                    setState(() {
+                      _prescriptionDays++;
+                      _showValidationErrors = false;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 2. 자주 쓰는 프리셋 버튼 (3일, 7일, 14일, 30일)
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: [
+              buildPresetChip(3),
+              buildPresetChip(7),
+              buildPresetChip(14),
+              buildPresetChip(30),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepperButton({required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A3E),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        ),
+        child: Icon(icon, size: 32, color: Colors.white),
+      ),
+    );
+  }
+
   /// 언제 드시는 약인가요? — 3줄 고정 배치, 동일 크기 버튼.
   Widget _buildDoseTimeButtons() {
     final hasError = _showValidationErrors && !_hasTime;
@@ -811,14 +917,25 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
       padding: hasError ? const EdgeInsets.all(6) : EdgeInsets.zero,
       child: Column(
         children: [
-          // 1행: 일어나자마자 / 아침식사
-          Row(children: [chip(times[0]), const SizedBox(width: 10), chip(times[1])]),
+          // 1행 (3개): 아침식사 / 점심식사 / 저녁식사
+          Row(
+            children: [
+              chip(times[1]),
+              const SizedBox(width: 8),
+              chip(times[2]),
+              const SizedBox(width: 8),
+              chip(times[3]),
+            ],
+          ),
           const SizedBox(height: 10),
-          // 2행: 점심식사 / 저녁식사
-          Row(children: [chip(times[2]), const SizedBox(width: 10), chip(times[3])]),
-          const SizedBox(height: 10),
-          // 3행: 자기전 (전체 폭)
-          Row(children: [chip(times[4])]),
+          // 2행 (2개): 일어나자마자 / 자기전
+          Row(
+            children: [
+              chip(times[0]),
+              const SizedBox(width: 8),
+              chip(times[4]),
+            ],
+          ),
         ],
       ),
     );

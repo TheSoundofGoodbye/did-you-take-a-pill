@@ -29,11 +29,11 @@ extension DoseTimeExtension on DoseTime {
       case DoseTime.wakeUp:
         return '일어나자마자';
       case DoseTime.morning:
-        return '아침식사';
+        return '아침';
       case DoseTime.afternoon:
-        return '점심식사';
+        return '점심';
       case DoseTime.evening:
-        return '저녁식사';
+        return '저녁';
       case DoseTime.bedTime:
         return '자기전';
     }
