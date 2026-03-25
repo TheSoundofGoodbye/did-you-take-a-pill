@@ -115,30 +115,31 @@ class _MainDashboardState extends State<MainDashboard> {
                       ? _buildMedicationView(provider)
                       : _buildEmptyState(context),
                 ),
-                // 하단 약 등록 버튼
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 64,
-                    child: ElevatedButton.icon(
-                      key: const Key('settings_button'),
-                      onPressed: () => _navigateToSettings(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C83FD),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
-                      ),
-                      icon: const Icon(Icons.add, size: 26),
-                      label: const Text(
-                        '약 등록',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                // 하단 약 관리 버튼 (등록된 약이 있을 때만)
+                if (active.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 64,
+                      child: ElevatedButton.icon(
+                        key: const Key('settings_button'),
+                        onPressed: () => _navigateToSettings(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7C83FD),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.settings_rounded, size: 24),
+                        label: const Text(
+                          '약 관리',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             );
           },
