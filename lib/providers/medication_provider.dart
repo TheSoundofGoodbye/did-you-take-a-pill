@@ -4,6 +4,7 @@ import 'package:did_you_take_a_pill/models/dose_schedule.dart';
 import 'package:did_you_take_a_pill/services/medication_repository.dart';
 import 'package:did_you_take_a_pill/services/daily_check_in_service.dart';
 import 'package:did_you_take_a_pill/services/inventory_deduction_service.dart';
+import 'package:did_you_take_a_pill/services/image_storage_service.dart';
 
 /// 복약 상태와 약 목록을 UI에 노출하는 ChangeNotifier.
 /// 상태(bool)와 수치(int)만 다루며, 의학적 판단을 포함하지 않음.
@@ -11,14 +12,17 @@ class MedicationProvider extends ChangeNotifier {
   final MedicationRepository _repository;
   final DailyCheckInService _checkInService;
   final InventoryDeductionService _inventoryService;
+  final ImageStorageService _imageService;
 
   MedicationProvider({
     required MedicationRepository repository,
     required DailyCheckInService checkInService,
     required InventoryDeductionService inventoryService,
+    ImageStorageService? imageService,
   })  : _repository = repository,
         _checkInService = checkInService,
-        _inventoryService = inventoryService;
+        _inventoryService = inventoryService,
+        _imageService = imageService ?? ImageStorageService();
 
   /// 전체 약 목록.
   List<Medication> get medications => _repository.getAll();
@@ -64,22 +68,30 @@ class MedicationProvider extends ChangeNotifier {
   /// 새 약 추가.
   Future<void> addMedication({
     required String name,
-    required int totalCount,
+    required int totalDays,
     required List<DoseTime> doseTimes,
+    String? imagePath,
   }) async {
+    final totalCount = totalDays * doseTimes.length;
     final med = Medication(
       id: MedicationRepository.generateId(),
       name: name,
+      totalDays: totalDays,
       totalCount: totalCount,
       remainingCount: totalCount,
       doseTimes: doseTimes,
+      imagePath: imagePath,
     );
     await _repository.add(med);
     notifyListeners();
   }
 
-  /// 약 삭제.
+  /// 약 삭제 (연관 이미지 파일도 정리).
   Future<void> removeMedication(String id) async {
+    final med = _repository.getById(id);
+    if (med != null) {
+      await _imageService.deleteImage(med.imagePath);
+    }
     await _repository.delete(id);
     notifyListeners();
   }

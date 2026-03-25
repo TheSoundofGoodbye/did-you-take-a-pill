@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:did_you_take_a_pill/models/medication.dart';
 import 'package:did_you_take_a_pill/models/dose_schedule.dart';
 import 'package:did_you_take_a_pill/providers/medication_provider.dart';
+import 'package:did_you_take_a_pill/services/image_storage_service.dart';
 
 
 /// 약 설정 화면 — 약 리스트 편집 + 추가/삭제/수정.
@@ -86,9 +90,23 @@ class MedicationSettings extends StatelessWidget {
   }
 
   void _showAddSheet(BuildContext context) {
+    final medCount = context.read<MedicationProvider>().medications.length;
+    if (medCount >= 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('약은 최대 4개까지 등록할 수 있습니다.',
+              style: TextStyle(fontSize: 16)),
+          backgroundColor: Color(0xFFFF6B6B),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: false, // 실수로 닫히는 사고 방지
       backgroundColor: const Color(0xFF1A1A2E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -121,23 +139,17 @@ class _MedicationCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                // 알약 아이콘
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7C83FD).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.medication_rounded,
-                      color: Color(0xFF7C83FD), size: 32),
-                ),
+                // 약 사진 썸네일 또는 기본 아이콘 (크기 확대: 80x80)
+                _buildThumbnail(),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(medication.name,
+                      Text(
+                          medication.name.isNotEmpty
+                              ? medication.name
+                              : '약 (이름 없음)',
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
@@ -148,8 +160,8 @@ class _MedicationCard extends StatelessWidget {
                         runSpacing: 6,
                         children: [
                           _infoChip(
-                            '남은 약 ${medication.remainingCount}/${medication.totalCount}',
-                            medication.remainingCount <= 3
+                            '남은 ${medication.remainingDays}일 / ${medication.totalDays}일분',
+                            medication.remainingDays <= 3
                                 ? const Color(0xFFFF6B6B)
                                 : const Color(0xFF4ECDC4),
                           ),
@@ -207,10 +219,45 @@ class _MedicationCard extends StatelessWidget {
     );
   }
 
+  /// 약 사진 썸네일 또는 기본 알약 아이콘 (80x80).
+  Widget _buildThumbnail() {
+    final hasImage =
+        medication.imagePath != null && medication.imagePath!.isNotEmpty;
+
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        color: const Color(0xFF7C83FD).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: hasImage
+          ? (kIsWeb
+              ? Image.network(medication.imagePath!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      _defaultIcon())
+              : Image.file(File(medication.imagePath!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      _defaultIcon()))
+          : _defaultIcon(),
+    );
+  }
+
+  Widget _defaultIcon() {
+    return const Center(
+      child: Icon(Icons.medication_rounded,
+          color: Color(0xFF7C83FD), size: 40),
+    );
+  }
+
   void _showEditSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: false, // 실수로 닫히는 사고 방지
       backgroundColor: const Color(0xFF1A1A2E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -233,6 +280,8 @@ class _MedicationCard extends StatelessWidget {
   }
 
   void _confirmDelete(BuildContext context) {
+    final displayName =
+        medication.name.isNotEmpty ? medication.name : '이 약';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -241,7 +290,7 @@ class _MedicationCard extends StatelessWidget {
         title: const Text('약 삭제',
             style:
                 TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-        content: Text('\'${medication.name}\'을(를) 삭제하시겠습니까?',
+        content: Text('\'$displayName\'을(를) 삭제하시겠습니까?',
             style: TextStyle(color: Colors.white.withValues(alpha: 0.6))),
         actions: [
           TextButton(
@@ -278,39 +327,56 @@ class _MedicationFormSheet extends StatefulWidget {
 
 class _MedicationFormSheetState extends State<_MedicationFormSheet> {
   late final TextEditingController _nameController;
-  late final TextEditingController _countController;
+  late final TextEditingController _daysController;
   bool get _isEditMode => widget.medication != null;
 
   late final Map<DoseTime, bool> _selectedTimes;
+  final ImageStorageService _imageService = ImageStorageService();
+  String? _selectedImagePath;
+
+  // 유효성 검사 실패 시 하이라이트용 플래그
+  bool _showValidationErrors = false;
 
   @override
   void initState() {
     super.initState();
     final med = widget.medication;
     _nameController = TextEditingController(text: med?.name ?? '');
-    _countController = TextEditingController(
-        text: med != null ? med.totalCount.toString() : '');
+    _daysController = TextEditingController(
+        text: med != null ? med.totalDays.toString() : '');
     _selectedTimes = {
-      DoseTime.morning: med?.doseTimes.contains(DoseTime.morning) ?? true,
-      DoseTime.afternoon:
-          med?.doseTimes.contains(DoseTime.afternoon) ?? false,
-      DoseTime.evening: med?.doseTimes.contains(DoseTime.evening) ?? false,
+      DoseTime.wakeUp:    med?.doseTimes.contains(DoseTime.wakeUp) ?? false,
+      DoseTime.morning:   med?.doseTimes.contains(DoseTime.morning) ?? true,
+      DoseTime.afternoon: med?.doseTimes.contains(DoseTime.afternoon) ?? false,
+      DoseTime.evening:   med?.doseTimes.contains(DoseTime.evening) ?? false,
+      DoseTime.bedTime:   med?.doseTimes.contains(DoseTime.bedTime) ?? false,
     };
+    _selectedImagePath = med?.imagePath;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _countController.dispose();
+    _daysController.dispose();
     super.dispose();
   }
 
-  bool get _isValid {
+  bool get _hasNameOrImage {
     final hasName = _nameController.text.trim().isNotEmpty;
-    final hasCount = (int.tryParse(_countController.text.trim()) ?? 0) > 0;
-    final hasTime = _selectedTimes.values.any((v) => v);
-    return hasName && hasCount && hasTime;
+    final hasImage =
+        _selectedImagePath != null && _selectedImagePath!.isNotEmpty;
+    return hasName || hasImage;
   }
+
+  bool get _hasDays {
+    return (int.tryParse(_daysController.text.trim()) ?? 0) > 0;
+  }
+
+  bool get _hasTime {
+    return _selectedTimes.values.any((v) => v);
+  }
+
+  bool get _isValid => _hasNameOrImage && _hasDays && _hasTime;
 
   List<DoseTime> get _selectedDoseTimes {
     return _selectedTimes.entries
@@ -319,22 +385,149 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
         .toList();
   }
 
+  /// 저장 버튼이 비활성일 때 누르면 → 필수입력란 하이라이트.
+  void _onSavePressed() {
+    if (_isValid) {
+      _submit();
+    } else {
+      setState(() => _showValidationErrors = true);
+    }
+  }
+
+  /// 이미지 소스 선택 바텀시트.
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text('사진 등록 방법',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white)),
+              const SizedBox(height: 16),
+              _buildSourceOption(
+                icon: Icons.camera_alt_rounded,
+                label: '카메라로 촬영',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              const SizedBox(height: 8),
+              _buildSourceOption(
+                icon: Icons.photo_library_rounded,
+                label: '갤러리에서 선택',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (_selectedImagePath != null) ...[
+                const SizedBox(height: 8),
+                _buildSourceOption(
+                  icon: Icons.delete_outline_rounded,
+                  label: '사진 삭제',
+                  color: const Color(0xFFFF6B6B),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() => _selectedImagePath = null);
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourceOption({
+    required IconData icon,
+    required String label,
+    VoidCallback? onTap,
+    Color color = const Color(0xFF4ECDC4),
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(width: 16),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final path = await _imageService.pickAndCropImage(
+      context: context,
+      source: source,
+    );
+    if (path != null) {
+      setState(() {
+        _selectedImagePath = path;
+        _showValidationErrors = false;
+      });
+    }
+  }
+
   Future<void> _submit() async {
     if (!_isValid) return;
     final provider = context.read<MedicationProvider>();
+    final name = _nameController.text.trim();
+    final totalDays = int.parse(_daysController.text.trim());
 
     if (_isEditMode) {
+      final totalCount = totalDays * _selectedDoseTimes.length;
       final updated = widget.medication!.copyWith(
-        name: _nameController.text.trim(),
-        totalCount: int.parse(_countController.text.trim()),
+        name: name,
+        totalDays: totalDays,
+        totalCount: totalCount,
         doseTimes: _selectedDoseTimes,
+        imagePath: _selectedImagePath,
+        clearImage: _selectedImagePath == null,
       );
       await provider.updateMedication(updated);
     } else {
       await provider.addMedication(
-        name: _nameController.text.trim(),
-        totalCount: int.parse(_countController.text.trim()),
+        name: name,
+        totalDays: totalDays,
         doseTimes: _selectedDoseTimes,
+        imagePath: _selectedImagePath,
       );
     }
 
@@ -346,220 +539,352 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
     return Padding(
       padding: EdgeInsets.fromLTRB(
           24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 핸들바
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(_isEditMode ? '약 수정' : '약 추가',
-              style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white)),
-          const SizedBox(height: 20),
-
-          // 약 이름
-          _buildLabel('약 이름'),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _nameController,
-            hint: '예: 고혈압약',
-            key: 'medication_name_input',
-          ),
-          const SizedBox(height: 16),
-
-          // 총 갯수
-          _buildLabel('총 갯수'),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _countController,
-            hint: '예: 30',
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            key: 'medication_count_input',
-          ),
-          const SizedBox(height: 20),
-
-          // 복용주기
-          _buildLabel('복용주기'),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _buildChip('매일', true, large: true),
-              const SizedBox(width: 8),
-              _buildChip('기타', false, large: false),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 복용시기 (체크박스)
-          _buildLabel('복용시기'),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _buildTimeCheckbox(DoseTime.morning),
-              const SizedBox(width: 12),
-              _buildTimeCheckbox(DoseTime.afternoon),
-              const SizedBox(width: 12),
-              _buildTimeCheckbox(DoseTime.evening),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // 저장 버튼 (높이 두배)
-          ElevatedButton(
-            key: const Key('save_medication_button'),
-            onPressed: _isValid ? _submit : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7C83FD),
-              disabledBackgroundColor: const Color(0xFF2A2A40),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: Text(_isEditMode ? '수정' : '저장',
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChip(String label, bool isSelected, {bool large = true}) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: large ? 20 : 14,
-        vertical: large ? 10 : 7,
-      ),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? const Color(0xFF7C83FD).withValues(alpha: 0.2)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isSelected
-              ? const Color(0xFF7C83FD)
-              : Colors.white.withValues(alpha: 0.15),
-          width: 1.5,
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: large ? 15 : 13,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-          color: isSelected
-              ? const Color(0xFF7C83FD)
-              : Colors.white.withValues(alpha: 0.35),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimeCheckbox(DoseTime doseTime) {
-    final isChecked = _selectedTimes[doseTime] ?? false;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _selectedTimes[doseTime] = !isChecked;
-          });
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: isChecked
-                ? const Color(0xFF4ECDC4).withValues(alpha: 0.15)
-                : const Color(0xFF0F0F1A),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isChecked
-                  ? const Color(0xFF4ECDC4)
-                  : Colors.white.withValues(alpha: 0.12),
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                isChecked
-                    ? Icons.check_circle_rounded
-                    : Icons.circle_outlined,
-                size: 22,
-                color: isChecked
-                    ? const Color(0xFF4ECDC4)
-                    : Colors.white.withValues(alpha: 0.25),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                doseTime.displayName,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: isChecked ? FontWeight.w700 : FontWeight.w400,
-                  color: isChecked
-                      ? const Color(0xFF4ECDC4)
-                      : Colors.white.withValues(alpha: 0.4),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 핸들바
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ],
+            ),
+            const SizedBox(height: 20),
+            Text(_isEditMode ? '약 수정' : '약 추가',
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+            const SizedBox(height: 20),
+
+            // ── 사진 등록 영역 ──
+            _buildLabel('약 사진 (선택)'),
+            const SizedBox(height: 8),
+            _buildImagePicker(),
+            const SizedBox(height: 16),
+
+            // 약 이름 (optional - 사진이 있으면 생략 가능)
+            _buildLabel('약 이름 (사진이 있으면 생략 가능)'),
+            const SizedBox(height: 8),
+            _buildValidatedTextField(
+              controller: _nameController,
+              hint: '예: 고혈압약',
+              key: 'medication_name_input',
+              hasError: _showValidationErrors && !_hasNameOrImage,
+              errorText: '사진 또는 이름을 입력하세요',
+            ),
+            const SizedBox(height: 16),
+
+            // 처방 일수
+            _buildLabel('처방 일수'),
+            const SizedBox(height: 8),
+            _buildValidatedTextField(
+              controller: _daysController,
+              hint: '예: 7',
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              key: 'medication_days_input',
+              hasError: _showValidationErrors && !_hasDays,
+              errorText: '처방 일수를 입력하세요',
+            ),
+            const SizedBox(height: 20),
+
+            // 언제 드시는 약인가요? (5개 버튼)
+            const Text(
+              '언제 드시는 약인가요?',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            if (_showValidationErrors && !_hasTime)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('복용 시기를 하나 이상 선택하세요',
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: const Color(0xFFFF6B6B).withValues(alpha: 0.9))),
+              ),
+            const SizedBox(height: 12),
+            _buildDoseTimeButtons(),
+            const SizedBox(height: 24),
+
+            // 저장 버튼 — 항상 활성, 미입력 시 하이라이트
+            ElevatedButton(
+              key: const Key('save_medication_button'),
+              onPressed: _onSavePressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isValid
+                    ? const Color(0xFF4ECDC4)   // 민트 — 불투명 고대비
+                    : const Color(0xFF1E1E30),  // 비활성: 매우 어두운 배경
+                foregroundColor: _isValid ? Colors.white : Colors.white38,
+                shadowColor: _isValid
+                    ? const Color(0xFF4ECDC4).withValues(alpha: 0.5)
+                    : Colors.transparent,
+                elevation: _isValid ? 6 : 0,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: _isValid
+                      ? BorderSide.none
+                      : BorderSide(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          width: 1.5),
+                ),
+              ),
+              child: Text(_isEditMode ? '수정' : '저장',
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 사진 등록/미리보기 영역.
+  Widget _buildImagePicker() {
+    final hasImage =
+        _selectedImagePath != null && _selectedImagePath!.isNotEmpty;
+
+    return GestureDetector(
+      onTap: _showImageSourcePicker,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: double.infinity,
+        height: 120,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F1A),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: hasImage
+                ? const Color(0xFF4ECDC4).withValues(alpha: 0.4)
+                : (_showValidationErrors && !_hasNameOrImage)
+                    ? const Color(0xFFFF6B6B).withValues(alpha: 0.6)
+                    : Colors.white.withValues(alpha: 0.12),
+            width: 1.5,
           ),
         ),
+        clipBehavior: Clip.antiAlias,
+        child: hasImage ? _buildImagePreview() : _buildImagePlaceholder(),
+      ),
+    );
+  }
+
+  Widget _buildImagePlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.add_a_photo_rounded,
+            size: 40, color: Colors.white.withValues(alpha: 0.55)),
+        const SizedBox(height: 10),
+        Text('사진으로 등록  (터치)',
+            style: TextStyle(
+                fontSize: 17,
+                color: Colors.white.withValues(alpha: 0.75),
+                fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  Widget _buildImagePreview() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        kIsWeb
+            ? Image.network(_selectedImagePath!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildImagePlaceholder())
+            : Image.file(File(_selectedImagePath!),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildImagePlaceholder()),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.7),
+                ],
+              ),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.edit_rounded, color: Colors.white70, size: 18),
+                SizedBox(width: 6),
+                Text('터치하여 변경',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 언제 드시는 약인가요? — 3줄 고정 배치, 동일 크기 버튼.
+  Widget _buildDoseTimeButtons() {
+    final hasError = _showValidationErrors && !_hasTime;
+
+    Widget chip(DoseTime dt) {
+      final isSelected = _selectedTimes[dt] ?? false;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() {
+            _selectedTimes[dt] = !isSelected;
+            _showValidationErrors = false;
+          }),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? const Color(0xFF4ECDC4).withValues(alpha: 0.2) // 선택: 밝은 녹색 배경
+                  : const Color(0xFF2A2A3E),                        // 미선택: 회색 — 배경과 구분됨
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected
+                    ? const Color(0xFF4ECDC4)                       // 선택: 밝은 녹색 테두리
+                    : Colors.white.withValues(alpha: 0.35),         // 미선택: 더 밝은 테두리
+                width: isSelected ? 2.5 : 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  size: 20,
+                  color: isSelected
+                      ? const Color(0xFF4ECDC4)
+                      : Colors.white.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  dt.buttonLabel,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.80),   // 미선택도 선명하게
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final times = DoseTime.values; // wakeUp, morning, afternoon, evening, bedTime
+    return Container(
+      decoration: hasError
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: const Color(0xFFFF6B6B).withValues(alpha: 0.6),
+                  width: 1.5))
+          : null,
+      padding: hasError ? const EdgeInsets.all(6) : EdgeInsets.zero,
+      child: Column(
+        children: [
+          // 1행: 일어나자마자 / 아침식사
+          Row(children: [chip(times[0]), const SizedBox(width: 10), chip(times[1])]),
+          const SizedBox(height: 10),
+          // 2행: 점심식사 / 저녁식사
+          Row(children: [chip(times[2]), const SizedBox(width: 10), chip(times[3])]),
+          const SizedBox(height: 10),
+          // 3행: 자기전 (전체 폭)
+          Row(children: [chip(times[4])]),
+        ],
       ),
     );
   }
 
   Widget _buildLabel(String text) {
     return Text(text,
-        style: TextStyle(
-            fontSize: 13,
-            color: Colors.white.withValues(alpha: 0.5),
-            letterSpacing: 1));
+        style: const TextStyle(
+            fontSize: 16,
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5));
   }
 
-  Widget _buildTextField({
+  /// 유효성 검사 에러 표시가 포함된 텍스트필드.
+  Widget _buildValidatedTextField({
     required TextEditingController controller,
     required String hint,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
     String? key,
+    bool hasError = false,
+    String? errorText,
   }) {
-    return TextField(
-      key: key != null ? Key(key) : null,
-      controller: controller,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      onChanged: (_) => setState(() {}),
-      style: const TextStyle(fontSize: 16, color: Colors.white),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2)),
-        filled: true,
-        fillColor: const Color(0xFF0F0F1A),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: Color(0xFF7C83FD), width: 2)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          key: key != null ? Key(key) : null,
+          controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          onChanged: (_) => setState(() => _showValidationErrors = false),
+          style: const TextStyle(fontSize: 16, color: Colors.white),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+            filled: true,
+            fillColor: const Color(0xFF22223A),  // 배경보다 밝은 회색으로 필드 영역 구분
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.25))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    const BorderSide(color: Color(0xFF4ECDC4), width: 2)), // 포커스: 민트
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: hasError
+                    ? BorderSide(
+                        color: const Color(0xFFFF6B6B).withValues(alpha: 0.8),
+                        width: 1.5)
+                    : BorderSide(color: Colors.white.withValues(alpha: 0.25))),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+        if (hasError && errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(errorText,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: const Color(0xFFFF6B6B).withValues(alpha: 0.8))),
+          ),
+      ],
     );
   }
 }

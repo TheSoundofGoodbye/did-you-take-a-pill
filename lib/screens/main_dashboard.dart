@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:did_you_take_a_pill/models/dose_schedule.dart';
@@ -40,25 +43,29 @@ class _MainDashboardState extends State<MainDashboard> {
         _pageController != null) {
       return;
     }
+
+    final oldActive = _activeDoseTimes;
     _activeDoseTimes = List.from(newActive);
 
-    final currentDose = DoseTimeExtension.fromCurrentTime();
-    final idx = _activeDoseTimes.indexOf(currentDose);
-    final targetPage = idx >= 0 ? idx : 0;
+    // 기존 페이지 위치 복원 시도: 이전에 보고 있던 DoseTime이 새 목록에도 있으면 유지
+    int targetPage;
+    if (oldActive.isNotEmpty &&
+        _currentPage < oldActive.length &&
+        newActive.contains(oldActive[_currentPage])) {
+      targetPage = newActive.indexOf(oldActive[_currentPage]);
+    } else {
+      // 첫 진입이거나 이전 페이지의 doseTime이 없어진 경우 → 현재 시간 기준
+      final currentDose = DoseTimeExtension.fromCurrentTime();
+      final idx = newActive.indexOf(currentDose);
+      targetPage = idx >= 0 ? idx : 0;
+    }
 
     _pageController?.dispose();
     _pageController = PageController(
       initialPage: targetPage,
-      viewportFraction: newActive.length == 1 ? 0.7 : 0.45,
+      viewportFraction: newActive.length == 1 ? 0.85 : 0.85,
     );
     _currentPage = targetPage;
-  }
-
-  /// 설정 화면에서 돌아올 때 강제 리셋.
-  void _forceResetController() {
-    _activeDoseTimes = [];
-    _pageController?.dispose();
-    _pageController = null;
   }
 
   bool _listEquals(List<DoseTime> a, List<DoseTime> b) {
@@ -85,13 +92,31 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 
   Future<void> _navigateToSettings(BuildContext context) async {
+    // 설정 진입 전 현재 보고 있던 페이지 저장
+    final savedPage = _currentPage;
+    final savedDoseTimes = List<DoseTime>.from(_activeDoseTimes);
+
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const MedicationSettings()),
     );
-    // 설정에서 돌아올 때 컨트롤러 강제 리셋 → 다음 build에서 재생성
-    _forceResetController();
-    if (mounted) setState(() {});
+
+    // 설정에서 돌아올 때: doseTimes 변경 감지하여 필요 시만 재생성
+    if (mounted) {
+      final provider = context.read<MedicationProvider>();
+      final newActive = provider.activeDoseTimes;
+
+      if (!_listEquals(newActive, savedDoseTimes)) {
+        // 약 설정이 바뀐 경우 → 컨트롤러 재생성 (이전 위치 복원 시도는 _syncPageController에서)
+        _activeDoseTimes = [];
+        _pageController?.dispose();
+        _pageController = null;
+      } else {
+        // 변경 없음 → 이전 페이지 위치 유지
+        _currentPage = savedPage;
+      }
+      setState(() {});
+    }
   }
 
   @override
@@ -224,120 +249,112 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 
   Widget _buildCapsulePageView(MedicationProvider provider) {
+    if (_pageController == null) return const SizedBox.shrink();
     return Stack(
-      alignment: Alignment.center,
       children: [
-        // PageView (좌우 swipe 지원)
-        if (_pageController != null)
-          PageView.builder(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            onPageChanged: (page) => setState(() => _currentPage = page),
-            itemCount: _activeDoseTimes.length,
-            itemBuilder: (context, index) {
-              final doseTime = _activeDoseTimes[index];
-              final meds = provider.getMedsForDoseTime(doseTime);
-              final allTaken = provider.isAllTaken(doseTime);
+        PageView.builder(
+          controller: _pageController,
+          physics: const BouncingScrollPhysics(),
+          onPageChanged: (page) => setState(() => _currentPage = page),
+          itemCount: _activeDoseTimes.length,
+          itemBuilder: (context, index) {
+            final doseTime = _activeDoseTimes[index];
+            final meds = provider.getMedsForDoseTime(doseTime);
+            final allTaken = provider.isAllTaken(doseTime);
 
-              return AnimatedBuilder(
-                animation: _pageController!,
-                builder: (context, child) {
-                  double scale = 0.7;
-                  double opacity = 0.5;
+            return AnimatedBuilder(
+              animation: _pageController!,
+              builder: (context, child) {
+                double scale = 0.7;
+                double opacity = 0.5;
 
-                  if (_pageController!.position.haveDimensions) {
-                    final page =
-                        _pageController!.page ?? _currentPage.toDouble();
-                    final diff = (page - index).abs();
-                    scale = (1 - diff * 0.3).clamp(0.7, 1.0);
-                    opacity = (1 - diff * 0.5).clamp(0.5, 1.0);
-                  }
+                if (_pageController!.position.haveDimensions) {
+                  final page =
+                      _pageController!.page ?? _currentPage.toDouble();
+                  final diff = (page - index).abs();
+                  scale = (1 - diff * 0.3).clamp(0.7, 1.0);
+                  opacity = (1 - diff * 0.5).clamp(0.5, 1.0);
+                }
 
-                  return Transform.scale(
-                    scale: scale,
-                    child: Opacity(
-                      opacity: opacity,
-                      child: _buildTimeSlot(
-                        provider, doseTime, meds, allTaken,
-                        index == _currentPage,
-                      ),
+                return Transform.scale(
+                  scale: scale,
+                  child: Opacity(
+                    opacity: opacity,
+                    child: _buildTimeSlot(
+                      provider, doseTime, meds, allTaken,
+                      index == _currentPage,
                     ),
-                  );
-                },
-              );
-            },
-          ),
-
-        // 좌우 화살표 (상하로 긴 밝은 버튼)
+                  ),
+                );
+              },
+            );
+          },
+        ),
         if (_activeDoseTimes.length > 1) ...[
+          // 왼쪽 화살표
           Positioned(
             left: 0,
-            top: 40,
-            bottom: 40,
-            child: _currentPage > 0
-                ? GestureDetector(
-                    onTap: () {
-                      _pageController?.previousPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
-                    child: Container(
-                      width: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: const BorderRadius.horizontal(
-                          right: Radius.circular(12),
-                        ),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.chevron_left_rounded,
-                          size: 40,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  )
-                : const SizedBox(width: 56),
+            top: 0,
+            bottom: 0,
+            width: 44,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                if (_currentPage > 0) {
+                  _pageController?.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: _currentPage > 0 ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    Icons.chevron_left_rounded,
+                    size: 36,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
           ),
+          // 오른쪽 화살표
           Positioned(
             right: 0,
-            top: 40,
-            bottom: 40,
-            child: _currentPage < _activeDoseTimes.length - 1
-                ? GestureDetector(
-                    onTap: () {
-                      _pageController?.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
-                    child: Container(
-                      width: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: const BorderRadius.horizontal(
-                          left: Radius.circular(12),
-                        ),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.chevron_right_rounded,
-                          size: 40,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  )
-                : const SizedBox(width: 40),
+            top: 0,
+            bottom: 0,
+            width: 44,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                if (_currentPage < _activeDoseTimes.length - 1) {
+                  _pageController?.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: _currentPage < _activeDoseTimes.length - 1 ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 36,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ],
     );
   }
 
-  /// 시간대별 슬롯: 약 갯수만큼 개별 캡슐 표시 (max 3).
+  /// 시간대별 슬롯: 약 갯수만큼 그리드 배치 (max 4, 2×2).
   Widget _buildTimeSlot(
     MedicationProvider provider,
     DoseTime doseTime,
@@ -345,51 +362,75 @@ class _MainDashboardState extends State<MainDashboard> {
     bool allTaken,
     bool isActive,
   ) {
-    final displayMeds = meds.take(3).toList();
+    final displayMeds = meds.take(4).toList();
+    final count = displayMeds.length;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // 시간대 라벨
+        // 시간대 라벨 (어르신들에게 정확한 시간 표시는 혼란을 줄 수 있으므로 제거)
         Text(
-          '${doseTime.displayName} (${doseTime.timeLabel})',
+          doseTime.displayName,
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.white.withValues(alpha: isActive ? 0.7 : 0.3),
-            letterSpacing: 1,
+            fontSize: 34,
+            fontWeight: FontWeight.w800,
+            color: Colors.white.withValues(alpha: isActive ? 0.9 : 0.4),
+            letterSpacing: 2.0,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
-        // 약별 개별 캡슐 버튼
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: displayMeds.map((med) {
-            final taken = provider.isTaken(med.id, doseTime);
-            return _buildSingleCapsule(
-              provider, med, doseTime, taken, isActive,
-              totalCount: displayMeds.length,
-            );
-          }).toList(),
+        // 캡슐 그리드 영역 — LayoutBuilder로 공간 최대 활용
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availW = constraints.maxWidth;
+              final availH = constraints.maxHeight;
+
+              // 그리드 행/열 계산
+              final cols = count == 1 ? 1 : 2;
+              final rows = (count / cols).ceil();
+
+              // 캡슐 크기: 사용 가능한 공간을 최대한 활용
+              final cellW = availW / cols;
+              final cellH = availH / rows;
+              final capsuleW = (cellW * 0.92).clamp(80.0, 300.0);
+              final capsuleH = (cellH * 0.85).clamp(100.0, 280.0);
+
+              // 폰트/아이콘 사이즈를 캡슐 크기에 비례 (가로/세로 중 작은 비율에 맞춤)
+              final iconSize = (math.min(capsuleW * 0.38, capsuleH * 0.25)).clamp(28.0, 80.0);
+              final nameSize = (math.min(capsuleW * 0.10, capsuleH * 0.08)).clamp(11.0, 18.0);
+
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: _buildGridRows(
+                  provider, doseTime, displayMeds, isActive,
+                  capsuleW: capsuleW,
+                  capsuleH: capsuleH,
+                  iconSize: iconSize,
+                  nameSize: nameSize,
+                ),
+              );
+            },
+          ),
         ),
-
-        const SizedBox(height: 16),
 
         // 상태 텍스트
         if (isActive)
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: Text(
-              allTaken ? '복약 완료 ✓' : '약을 터치해주세요',
-              key: ValueKey(allTaken),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: allTaken
-                    ? const Color(0xFF4ECDC4)
-                    : Colors.white.withValues(alpha: 0.4),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Text(
+                allTaken ? '복약 완료 ✓' : '약을 터치해주세요',
+                key: ValueKey(allTaken),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: allTaken
+                      ? const Color(0xFF4ECDC4)
+                      : Colors.white.withValues(alpha: 0.4),
+                ),
               ),
             ),
           ),
@@ -397,98 +438,125 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  /// 개별 약 캡슐 버튼.
+  /// 그리드 행 빌드: 2열 기준으로 약을 배치.
+  List<Widget> _buildGridRows(
+    MedicationProvider provider,
+    DoseTime doseTime,
+    List<Medication> meds,
+    bool isActive, {
+    required double capsuleW,
+    required double capsuleH,
+    required double iconSize,
+    required double nameSize,
+  }) {
+    final rows = <Widget>[];
+    for (int i = 0; i < meds.length; i += 2) {
+      final rowMeds = meds.skip(i).take(2).toList();
+      final children = rowMeds.map((med) {
+        final taken = provider.isTaken(med.id, doseTime);
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: _buildSingleCapsule(
+              provider, med, doseTime, taken, isActive,
+              capsuleW: capsuleW,
+              capsuleH: capsuleH,
+              iconSize: iconSize,
+              nameSize: nameSize,
+            ),
+          ),
+        );
+      }).toList();
+
+      // 홀수 행(3개일 때 마지막 1개): 빈 Expanded 추가로 폭 맞춤
+      if (rowMeds.length == 1 && meds.length > 1) {
+        children.add(const Expanded(child: SizedBox.shrink()));
+      }
+
+      rows.add(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: children,
+        ),
+      );
+      if (i + 2 < meds.length) {
+        rows.add(const SizedBox(height: 6));
+      }
+    }
+    return rows;
+  }
+
+  /// 개별 약 캡슐 버튼 — 너비는 부모 Expanded가 제어.
   Widget _buildSingleCapsule(
     MedicationProvider provider,
     Medication med,
     DoseTime doseTime,
     bool taken,
     bool isActive, {
-    required int totalCount,
+    required double capsuleW, // borderRadius 계산용
+    required double capsuleH,
+    required double iconSize,
+    required double nameSize,
   }) {
-    final double capsuleW =
-        totalCount == 1 ? 120 : (totalCount == 2 ? 90 : 75);
-    final double capsuleH =
-        totalCount == 1 ? 190 : (totalCount == 2 ? 160 : 140);
-    final double iconSize =
-        totalCount == 1 ? 48 : (totalCount == 2 ? 38 : 32);
-    final double nameSize =
-        totalCount == 1 ? 16 : (totalCount == 2 ? 14 : 13);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      child: GestureDetector(
-        onTap: isActive ? () => provider.toggleFor(med.id, doseTime) : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-          width: isActive ? capsuleW : capsuleW * 0.75,
-          height: isActive ? capsuleH : capsuleH * 0.8,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(capsuleW / 2),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: taken
-                  ? [
-                      const Color(0xFF4ECDC4).withValues(alpha: 0.9),
-                      const Color(0xFF44B09E).withValues(alpha: 0.7),
-                    ]
-                  : [
-                      const Color(0xFF2A2A45).withValues(alpha: 0.9),
-                      const Color(0xFF1A1A30).withValues(alpha: 0.7),
-                    ],
-            ),
-            boxShadow: taken && isActive
+    return GestureDetector(
+      onTap: isActive ? () => provider.toggleFor(med.id, doseTime) : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+        height: isActive ? capsuleH : capsuleH * 0.85,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(40),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: taken
                 ? [
-                    BoxShadow(
-                      color:
-                          const Color(0xFF4ECDC4).withValues(alpha: 0.35),
-                      blurRadius: 20,
-                      spreadRadius: 3,
-                    ),
+                    const Color(0xFF4ECDC4).withValues(alpha: 0.9),
+                    const Color(0xFF44B09E).withValues(alpha: 0.7),
                   ]
                 : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
-                    ),
+                    const Color(0xFF3A3A5A).withValues(alpha: 0.95),
+                    const Color(0xFF2A2A45).withValues(alpha: 0.85),
                   ],
-            border: Border.all(
-              color: taken
-                  ? const Color(0xFF4ECDC4).withValues(alpha: 0.5)
-                  : Colors.white.withValues(alpha: 0.08),
-              width: 1.5,
-            ),
           ),
+          boxShadow: taken && isActive
+              ? [
+                  BoxShadow(
+                    color:
+                        const Color(0xFF4ECDC4).withValues(alpha: 0.35),
+                    blurRadius: 20,
+                    spreadRadius: 3,
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+          border: Border.all(
+            color: taken
+                ? const Color(0xFF4ECDC4).withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.15),
+            width: 1.5,
+          ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 체크 or 알약 아이콘
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: taken
-                    ? Icon(
-                        Icons.check_rounded,
-                        key: const ValueKey('check'),
-                        size: iconSize,
-                        color: Colors.white,
-                      )
-                    : Icon(
-                        Icons.medication_rounded,
-                        key: const ValueKey('pill'),
-                        size: iconSize,
-                        color: Colors.white.withValues(alpha: 0.35),
-                      ),
-              ),
-              // 약 이름 (캡슐 아래에 큰 폰트)
-              if (isActive) ...[
-                const SizedBox(height: 8),
+              // 사진/아이콘 — 복용 후에도 사진 유지 (체크 오버레이)
+              _buildCapsuleContent(med, iconSize, taken),
+              // 약 이름: 사진 없으면 위에서 크게 표시하므로 여기선 사진 있을 때만
+              if (isActive && med.imagePath != null && med.imagePath!.isNotEmpty) ...[
+                const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: Text(
-                    med.name,
+                    med.name.isNotEmpty ? med.name : '약',
                     style: TextStyle(
                       fontSize: nameSize,
                       color: taken
@@ -497,7 +565,7 @@ class _MainDashboardState extends State<MainDashboard> {
                       fontWeight: FontWeight.w700,
                     ),
                     textAlign: TextAlign.center,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -506,6 +574,116 @@ class _MainDashboardState extends State<MainDashboard> {
           ),
         ),
       ),
+    );
+  }
+
+  /// 캡슐 내부 콘텐츠: 사진 → 큰 썸네일, 텍스트만 → 큰 텍스트.
+  Widget _buildCapsuleContent(Medication med, double iconSize, bool taken) {
+    final hasImage = med.imagePath != null && med.imagePath!.isNotEmpty;
+
+    if (hasImage) {
+      // 2.2 -> 1.9로 줄였으나 너무 작다는 피드백 반영, 중간인 2.05로 재조정
+      final imageSize = iconSize * 2.05;
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            key: const ValueKey('photo'),
+            width: imageSize,
+            height: imageSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: taken
+                    ? Colors.white.withValues(alpha: 0.6)
+                    : Colors.white.withValues(alpha: 0.3),
+                width: 2,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: kIsWeb
+                ? Image.network(med.imagePath!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _defaultPillIcon(iconSize))
+                : Image.file(File(med.imagePath!),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _defaultPillIcon(iconSize)),
+          ),
+          // 복용 완료 시 체크 오버레이
+          if (taken)
+            Container(
+              width: imageSize,
+              height: imageSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF4ECDC4).withValues(alpha: 0.5),
+              ),
+              child: Icon(
+                Icons.check_rounded,
+                size: iconSize * 0.7,
+                color: Colors.white,
+              ),
+            ),
+        ],
+      );
+    }
+
+    // 사진 없음: 약 이름을 크게 표시
+    final displayName = med.name.isNotEmpty ? med.name : '약';
+    final largeTextSize = (iconSize * 0.55).clamp(16.0, 32.0);
+
+    if (taken) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.check_rounded,
+            size: iconSize * 0.8,
+            color: Colors.white,
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              displayName,
+              style: TextStyle(
+                fontSize: largeTextSize,
+                fontWeight: FontWeight.w800,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Text(
+        displayName,
+        style: TextStyle(
+          fontSize: largeTextSize,
+          fontWeight: FontWeight.w800,
+          color: Colors.white.withValues(alpha: 0.6),
+        ),
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _defaultPillIcon(double iconSize) {
+    return Icon(
+      Icons.medication_rounded,
+      key: const ValueKey('pill'),
+      size: iconSize,
+      color: Colors.white.withValues(alpha: 0.35),
     );
   }
 
