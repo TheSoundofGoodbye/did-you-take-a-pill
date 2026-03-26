@@ -42,6 +42,8 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 
   void _loadNativeAd() {
+    if (kIsWeb) return; // 웹에서는 AdMob이 지원되지 않으므로 실행 방지
+
     _nativeAd = NativeAd(
       // Android Test Native Advanced Ad Unit ID
       // adUnitId: 'ca-app-pub-3940256099942544/2247696110',
