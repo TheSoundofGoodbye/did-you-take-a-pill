@@ -44,7 +44,9 @@ class _MainDashboardState extends State<MainDashboard> {
   void _loadNativeAd() {
     _nativeAd = NativeAd(
       // Android Test Native Advanced Ad Unit ID
-      adUnitId: 'ca-app-pub-3940256099942544/2247696110', 
+      // adUnitId: 'ca-app-pub-3940256099942544/2247696110',
+      // Android Real Native Advanced Ad Unit ID
+      adUnitId: 'ca-app-pub-7710267358364633/1212442339',
       listener: NativeAdListener(
         onAdLoaded: (ad) {
           setState(() {
@@ -90,8 +92,7 @@ class _MainDashboardState extends State<MainDashboard> {
   /// activeDoseTimes 변경 시 PageController 재생성.
   /// build 중 호출되므로 post-frame callback에서 setState.
   void _syncPageController(List<DoseTime> newActive) {
-    if (_listEquals(newActive, _activeDoseTimes) &&
-        _pageController != null) {
+    if (_listEquals(newActive, _activeDoseTimes) && _pageController != null) {
       return;
     }
 
@@ -108,7 +109,7 @@ class _MainDashboardState extends State<MainDashboard> {
       // 첫 진입이거나 이전 페이지의 doseTime이 없어진 경우 → 현재 시간 기준 (없으면 가장 가까운 이후 시간대)
       final currentDose = DoseTimeExtension.fromCurrentTime();
       int idx = newActive.indexOf(currentDose);
-      
+
       if (idx == -1 && newActive.isNotEmpty) {
         final currentDoseIndex = DoseTime.values.indexOf(currentDose);
         for (int i = 1; i < DoseTime.values.length; i++) {
@@ -218,13 +219,17 @@ class _MainDashboardState extends State<MainDashboard> {
                           backgroundColor: const Color(0xFF7C83FD),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                           elevation: 0,
                         ),
                         icon: const Icon(Icons.settings_rounded, size: 24),
                         label: const Text(
                           '약 관리',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -333,8 +338,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 double opacity = 0.5;
 
                 if (_pageController!.position.haveDimensions) {
-                  final page =
-                      _pageController!.page ?? _currentPage.toDouble();
+                  final page = _pageController!.page ?? _currentPage.toDouble();
                   final diff = (page - index).abs();
                   scale = (1 - diff * 0.3).clamp(0.7, 1.0);
                   opacity = (1 - diff * 0.5).clamp(0.5, 1.0);
@@ -345,7 +349,10 @@ class _MainDashboardState extends State<MainDashboard> {
                   child: Opacity(
                     opacity: opacity,
                     child: _buildTimeSlot(
-                      provider, doseTime, meds, allTaken,
+                      provider,
+                      doseTime,
+                      meds,
+                      allTaken,
                       index == _currentPage,
                     ),
                   ),
@@ -402,7 +409,9 @@ class _MainDashboardState extends State<MainDashboard> {
               },
               child: Center(
                 child: AnimatedOpacity(
-                  opacity: _currentPage < _activeDoseTimes.length - 1 ? 0.5 : 0.0,
+                  opacity: _currentPage < _activeDoseTimes.length - 1
+                      ? 0.5
+                      : 0.0,
                   duration: const Duration(milliseconds: 200),
                   child: const Icon(
                     Icons.chevron_right_rounded,
@@ -462,13 +471,22 @@ class _MainDashboardState extends State<MainDashboard> {
               final capsuleH = (cellH * 0.85).clamp(100.0, 280.0);
 
               // 폰트/아이콘 사이즈를 캡슐 크기에 비례 (가로/세로 중 작은 비율에 맞춤)
-              final iconSize = (math.min(capsuleW * 0.38, capsuleH * 0.25)).clamp(28.0, 80.0);
-              final nameSize = (math.min(capsuleW * 0.10, capsuleH * 0.08)).clamp(11.0, 18.0);
+              final iconSize = (math.min(
+                capsuleW * 0.38,
+                capsuleH * 0.25,
+              )).clamp(28.0, 80.0);
+              final nameSize = (math.min(
+                capsuleW * 0.10,
+                capsuleH * 0.08,
+              )).clamp(11.0, 18.0);
 
               return Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: _buildGridRows(
-                  provider, doseTime, displayMeds, isActive,
+                  provider,
+                  doseTime,
+                  displayMeds,
+                  isActive,
                   capsuleW: capsuleW,
                   capsuleH: capsuleH,
                   iconSize: iconSize,
@@ -504,8 +522,8 @@ class _MainDashboardState extends State<MainDashboard> {
           AnimatedSize(
             duration: const Duration(milliseconds: 600),
             curve: Curves.fastOutSlowIn,
-            child: allTaken 
-                ? _buildNativeAdContainer() 
+            child: allTaken
+                ? _buildNativeAdContainer()
                 : const SizedBox(height: 0, width: double.infinity),
           ),
       ],
@@ -532,7 +550,11 @@ class _MainDashboardState extends State<MainDashboard> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: _buildSingleCapsule(
-              provider, med, doseTime, taken, isActive,
+              provider,
+              med,
+              doseTime,
+              taken,
+              isActive,
               capsuleW: capsuleW,
               capsuleH: capsuleH,
               iconSize: iconSize,
@@ -597,8 +619,7 @@ class _MainDashboardState extends State<MainDashboard> {
           boxShadow: taken && isActive
               ? [
                   BoxShadow(
-                    color:
-                        const Color(0xFF4ECDC4).withValues(alpha: 0.35),
+                    color: const Color(0xFF4ECDC4).withValues(alpha: 0.35),
                     blurRadius: 20,
                     spreadRadius: 3,
                   ),
@@ -676,14 +697,18 @@ class _MainDashboardState extends State<MainDashboard> {
             ),
             clipBehavior: Clip.antiAlias,
             child: kIsWeb
-                ? Image.network(med.imagePath!,
+                ? Image.network(
+                    med.imagePath!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) =>
-                        _defaultPillIcon(iconSize))
-                : Image.file(File(med.imagePath!),
+                        _defaultPillIcon(iconSize),
+                  )
+                : Image.file(
+                    File(med.imagePath!),
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) =>
-                        _defaultPillIcon(iconSize)),
+                        _defaultPillIcon(iconSize),
+                  ),
           ),
           // 복용 완료 시 체크 오버레이
           if (taken)
@@ -792,7 +817,8 @@ class _MainDashboardState extends State<MainDashboard> {
                 backgroundColor: const Color(0xFF7C83FD),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 0,
               ),
               icon: const Icon(Icons.add_circle_outline, size: 28),
