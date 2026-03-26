@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:did_you_take_a_pill/providers/medication_provider.dart';
 import 'package:did_you_take_a_pill/services/medication_repository.dart';
 import 'package:did_you_take_a_pill/services/daily_check_in_service.dart';
@@ -10,6 +11,7 @@ import 'package:did_you_take_a_pill/screens/main_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await MobileAds.instance.initialize();
   await initializeDateFormatting('ko_KR', null);
   final prefs = await SharedPreferences.getInstance();
   final repository = MedicationRepository(prefs);

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:did_you_take_a_pill/models/dose_schedule.dart';
 import 'package:did_you_take_a_pill/models/medication.dart';
 import 'package:did_you_take_a_pill/providers/medication_provider.dart';
@@ -26,14 +27,64 @@ class _MainDashboardState extends State<MainDashboard> {
   int _currentPage = 0;
   List<DoseTime> _activeDoseTimes = [];
 
+  NativeAd? _nativeAd;
+  bool _isAdLoaded = false;
+
   @override
   void initState() {
     super.initState();
+    _loadNativeAd();
     _updateClock();
     _clockTimer = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _updateClock(),
     );
+  }
+
+  void _loadNativeAd() {
+    _nativeAd = NativeAd(
+      // Android Test Native Advanced Ad Unit ID
+      adUnitId: 'ca-app-pub-3940256099942544/2247696110', 
+      listener: NativeAdListener(
+        onAdLoaded: (ad) {
+          setState(() {
+            _isAdLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          print('Ad load failed: $error');
+        },
+      ),
+      request: const AdRequest(),
+      nativeTemplateStyle: NativeTemplateStyle(
+        templateType: TemplateType.small,
+        mainBackgroundColor: const Color(0xFF1E1E2E), // 앱 다크테마 배경과 맞춤
+        cornerRadius: 16.0,
+        callToActionTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white,
+          backgroundColor: const Color(0xFF4ECDC4),
+          style: NativeTemplateFontStyle.bold,
+          size: 13.0,
+        ),
+        primaryTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white,
+          backgroundColor: const Color(0xFF1E1E2E),
+          style: NativeTemplateFontStyle.bold,
+          size: 15.0,
+        ),
+        secondaryTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white54,
+          backgroundColor: const Color(0xFF1E1E2E),
+          size: 12.0,
+        ),
+        tertiaryTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white54,
+          backgroundColor: const Color(0xFF1E1E2E),
+          size: 12.0,
+        ),
+      ),
+    )..load();
   }
 
   /// activeDoseTimes 변경 시 PageController 재생성.
@@ -100,6 +151,7 @@ class _MainDashboardState extends State<MainDashboard> {
   void dispose() {
     _clockTimer.cancel();
     _pageController?.dispose();
+    _nativeAd?.dispose();
     super.dispose();
   }
 
@@ -755,81 +807,21 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  // ✨ 신규: 복약 달성 시 뜨는 네이티브 광고 컴포넌트 (모의 UI)
+  // ✨ 신규: 복약 달성 시 뜨는 진짜 네이티브 광고 컴포넌트
   Widget _buildNativeAdContainer() {
-    return Container(
-      margin: const EdgeInsets.only(top: 24, left: 16, right: 16),
-      height: 80,
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2E), // 배경보다 살짝 밝은 다크톤
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Row(
-        children: [
-          // 1. 광고 썸네일/아이콘 이미지
-          Container(
-            width: 80,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-              ),
-              color: Colors.white.withValues(alpha: 0.05),
-            ),
-            child: const Icon(Icons.image, color: Colors.white24, size: 32),
-          ),
-          const SizedBox(width: 12),
-          // 2. 광고 텍스트 영역
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFB74D), // 가독성 좋은 오렌지색
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Ad',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '무릎, 관절이 시리시다면?',
-                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const Text(
-                  '하루 한 알로 챙기는 뼈 건강',
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          // 3. 행동 유도 버튼
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: ElevatedButton(
-              onPressed: () {}, // 클릭 시 구글 네이티브 광고 동작 호출
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4ECDC4), // 앱 메인 컬러포인트 활용
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                minimumSize: const Size(64, 36),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-              child: const Text('알아보기', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            ),
-          )
-        ],
-      ),
-    );
+    if (_nativeAd != null && _isAdLoaded) {
+      return Container(
+        margin: const EdgeInsets.only(top: 24, left: 16, right: 16),
+        height: 120, // TemplateType.small 권장 최소 높이
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E2E),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: AdWidget(ad: _nativeAd!),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
