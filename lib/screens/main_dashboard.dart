@@ -54,9 +54,21 @@ class _MainDashboardState extends State<MainDashboard> {
         newActive.contains(oldActive[_currentPage])) {
       targetPage = newActive.indexOf(oldActive[_currentPage]);
     } else {
-      // 첫 진입이거나 이전 페이지의 doseTime이 없어진 경우 → 현재 시간 기준
+      // 첫 진입이거나 이전 페이지의 doseTime이 없어진 경우 → 현재 시간 기준 (없으면 가장 가까운 이후 시간대)
       final currentDose = DoseTimeExtension.fromCurrentTime();
-      final idx = newActive.indexOf(currentDose);
+      int idx = newActive.indexOf(currentDose);
+      
+      if (idx == -1 && newActive.isNotEmpty) {
+        final currentDoseIndex = DoseTime.values.indexOf(currentDose);
+        for (int i = 1; i < DoseTime.values.length; i++) {
+          final nextDoseIndex = (currentDoseIndex + i) % DoseTime.values.length;
+          final nextDose = DoseTime.values[nextDoseIndex];
+          if (newActive.contains(nextDose)) {
+            idx = newActive.indexOf(nextDose);
+            break;
+          }
+        }
+      }
       targetPage = idx >= 0 ? idx : 0;
     }
 
@@ -391,10 +403,10 @@ class _MainDashboardState extends State<MainDashboard> {
               final cols = count == 1 ? 1 : 2;
               final rows = (count / cols).ceil();
 
-              // 캡슐 크기: 사용 가능한 공간을 최대한 활용
+              // 캡슐 크기: 사용 가능한 공간을 최대한 활용 (좌우 너비를 기존 대비 85% 정도로 축소)
               final cellW = availW / cols;
               final cellH = availH / rows;
-              final capsuleW = (cellW * 0.92).clamp(80.0, 300.0);
+              final capsuleW = (cellW * 0.78).clamp(80.0, 300.0);
               final capsuleH = (cellH * 0.85).clamp(100.0, 280.0);
 
               // 폰트/아이콘 사이즈를 캡슐 크기에 비례 (가로/세로 중 작은 비율에 맞춤)
@@ -550,8 +562,8 @@ class _MainDashboardState extends State<MainDashboard> {
             children: [
               // 사진/아이콘 — 복용 후에도 사진 유지 (체크 오버레이)
               _buildCapsuleContent(med, iconSize, taken),
-              // 약 이름: 사진 없으면 위에서 크게 표시하므로 여기선 사진 있을 때만
-              if (isActive && med.imagePath != null && med.imagePath!.isNotEmpty) ...[
+              // 약 이름: 사진 여부와 관계없이 활성화 상태일 때 항상 아래에 표시
+              if (isActive) ...[
                 const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -630,51 +642,53 @@ class _MainDashboardState extends State<MainDashboard> {
       );
     }
 
-    // 사진 없음: 약 이름을 크게 표시
-    final displayName = med.name.isNotEmpty ? med.name : '약';
-    final largeTextSize = (iconSize * 0.55).clamp(16.0, 32.0);
-
-    if (taken) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.check_rounded,
-            size: iconSize * 0.8,
-            color: Colors.white,
-          ),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              displayName,
-              style: TextStyle(
-                fontSize: largeTextSize,
-                fontWeight: FontWeight.w800,
-                color: Colors.white.withValues(alpha: 0.9),
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+    // 사진 없음: 귀여운 알약 아이콘 표시
+    final imageSize = iconSize * 2.05;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          key: const ValueKey('cute_pill'),
+          width: imageSize,
+          height: imageSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: taken
+                ? const Color(0xFF4ECDC4).withValues(alpha: 0.2)
+                : Colors.white.withValues(alpha: 0.1),
+            border: Border.all(
+              color: taken
+                  ? Colors.white.withValues(alpha: 0.6)
+                  : Colors.white.withValues(alpha: 0.3),
+              width: 2,
             ),
           ),
-        ],
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text(
-        displayName,
-        style: TextStyle(
-          fontSize: largeTextSize,
-          fontWeight: FontWeight.w800,
-          color: Colors.white.withValues(alpha: 0.6),
+          child: Center(
+            child: Icon(
+              Icons.medication_liquid_rounded, // 귀여운 알약 아이콘
+              size: iconSize * 1.2,
+              color: taken
+                  ? Colors.white.withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: 0.7),
+            ),
+          ),
         ),
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
+        // 복용 완료 시 체크 오버레이
+        if (taken)
+          Container(
+            width: imageSize,
+            height: imageSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF4ECDC4).withValues(alpha: 0.6),
+            ),
+            child: Icon(
+              Icons.check_rounded,
+              size: iconSize * 0.7,
+              color: Colors.white,
+            ),
+          ),
+      ],
     );
   }
 
