@@ -10,6 +10,8 @@ class Medication {
   final int remainingCount;
   final List<DoseTime> doseTimes;
   final String? imagePath;
+  /// 약이 소진(remainingCount == 0)된 날짜. null이면 아직 남아있음.
+  final DateTime? depletedDate;
 
   const Medication({
     required this.id,
@@ -19,6 +21,7 @@ class Medication {
     required this.remainingCount,
     required this.doseTimes,
     this.imagePath,
+    this.depletedDate,
   });
 
   /// 남은 일수 계산 (내림 — 완전히 복용 가능한 일수만 표시).
@@ -39,6 +42,8 @@ class Medication {
     List<DoseTime>? doseTimes,
     String? imagePath,
     bool clearImage = false,
+    DateTime? depletedDate,
+    bool clearDepletedDate = false,
   }) {
     return Medication(
       id: id,
@@ -48,6 +53,7 @@ class Medication {
       remainingCount: remainingCount ?? this.remainingCount,
       doseTimes: doseTimes ?? this.doseTimes,
       imagePath: clearImage ? null : (imagePath ?? this.imagePath),
+      depletedDate: clearDepletedDate ? null : (depletedDate ?? this.depletedDate),
     );
   }
 
@@ -59,6 +65,7 @@ class Medication {
         'remainingCount': remainingCount,
         'doseTimes': doseTimes.map((dt) => dt.index).toList(),
         if (imagePath != null) 'imagePath': imagePath,
+        if (depletedDate != null) 'depletedDate': depletedDate!.toIso8601String(),
       };
 
   factory Medication.fromJson(Map<String, dynamic> json) {
@@ -70,6 +77,7 @@ class Medication {
     // 기존 데이터 호환: totalDays가 없으면 totalCount/doseTimes.length로 역산
     final totalDays = json['totalDays'] as int? ??
         (doseTimes.isNotEmpty ? (totalCount / doseTimes.length).ceil() : 0);
+    final depletedDateStr = json['depletedDate'] as String?;
     return Medication(
       id: json['id'] as String,
       name: json['name'] as String,
@@ -78,6 +86,7 @@ class Medication {
       remainingCount: json['remainingCount'] as int? ?? 0,
       doseTimes: doseTimes,
       imagePath: json['imagePath'] as String?,
+      depletedDate: depletedDateStr != null ? DateTime.parse(depletedDateStr) : null,
     );
   }
 

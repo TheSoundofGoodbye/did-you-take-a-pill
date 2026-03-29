@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -19,7 +20,8 @@ class MainDashboard extends StatefulWidget {
   State<MainDashboard> createState() => _MainDashboardState();
 }
 
-class _MainDashboardState extends State<MainDashboard> {
+class _MainDashboardState extends State<MainDashboard>
+    with WidgetsBindingObserver {
   PageController? _pageController;
   late Timer _clockTimer;
   String _time = '';
@@ -33,12 +35,17 @@ class _MainDashboardState extends State<MainDashboard> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadNativeAd();
     _updateClock();
     _clockTimer = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _updateClock(),
     );
+    // 앱 시작 시 소진 약 자동 정리
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MedicationProvider>().purgeDepletedMedications();
+    });
   }
 
   void _loadNativeAd() {
@@ -152,10 +159,28 @@ class _MainDashboardState extends State<MainDashboard> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _clockTimer.cancel();
     _pageController?.dispose();
     _nativeAd?.dispose();
     super.dispose();
+  }
+
+  /// 앱 라이프사이클 변화 감지: 복귀(resumed) 시 시간 갱신 + 소진 약 정리.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _updateClock();
+      // post-frame에서 안전하게 PageController 재동기화
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _activeDoseTimes = [];
+        _pageController?.dispose();
+        _pageController = null;
+        context.read<MedicationProvider>().purgeDepletedMedications();
+        setState(() {});
+      });
+    }
   }
 
   Future<void> _navigateToSettings(BuildContext context) async {
@@ -188,57 +213,65 @@ class _MainDashboardState extends State<MainDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F0F1A),
-      body: SafeArea(
-        child: Consumer<MedicationProvider>(
-          builder: (context, provider, _) {
-            final active = provider.activeDoseTimes;
-            _syncPageController(active);
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F0F1A),
+        body: SafeArea(
+          child: Consumer<MedicationProvider>(
+            builder: (context, provider, _) {
+              final active = provider.activeDoseTimes;
+              _syncPageController(active);
 
-            return Column(
-              children: [
-                _buildTopBar(),
-                const SizedBox(height: 8),
-                _buildClock(),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: active.isNotEmpty
-                      ? _buildMedicationView(provider)
-                      : _buildEmptyState(context),
-                ),
-                // 하단 약 관리 버튼 (등록된 약이 있을 때만)
-                if (active.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 64,
-                      child: ElevatedButton.icon(
-                        key: const Key('settings_button'),
-                        onPressed: () => _navigateToSettings(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF7C83FD),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+              return Column(
+                children: [
+                  _buildTopBar(),
+                  const SizedBox(height: 8),
+                  _buildClock(),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: active.isNotEmpty
+                        ? _buildMedicationView(provider)
+                        : _buildEmptyState(context),
+                  ),
+                  // 하단 약 관리 버튼 (등록된 약이 있을 때만)
+                  if (active.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 64,
+                        child: ElevatedButton.icon(
+                          key: const Key('settings_button'),
+                          onPressed: () => _navigateToSettings(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF7C83FD),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
                           ),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.settings_rounded, size: 24),
-                        label: const Text(
-                          '약 관리',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
+                          icon: const Icon(Icons.settings_rounded, size: 24),
+                          label: const Text(
+                            '약 관리',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -839,14 +872,12 @@ class _MainDashboardState extends State<MainDashboard> {
   Widget _buildNativeAdContainer() {
     if (_nativeAd != null && _isAdLoaded) {
       return Container(
-        margin: const EdgeInsets.only(top: 24, left: 16, right: 16),
-        height: 120, // TemplateType.small 권장 최소 높이
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E2E),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
+        margin: const EdgeInsets.only(top: 12, left: 16, right: 16),
+        height: 80, // TemplateType.small 실제 배너 높이에 맞춤
         clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: AdWidget(ad: _nativeAd!),
       );
     }

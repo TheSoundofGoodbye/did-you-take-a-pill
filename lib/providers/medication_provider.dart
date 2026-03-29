@@ -101,4 +101,29 @@ class MedicationProvider extends ChangeNotifier {
     await _repository.update(medication);
     notifyListeners();
   }
+
+  /// 소진된 약 자동 삭제: depletedDate가 있고 현재 4AM 기준일 이전이면 삭제.
+  /// "하루 기준" = 새벽 4시. 약이 0이 된 당일에는 삭제하지 않고,
+  /// 다음 날 4AM 이후에 삭제.
+  Future<void> purgeDepletedMedications() async {
+    final now = DateTime.now();
+    // 오늘의 4AM 기준선: 현재 4시 이전이면 어제 4시
+    final todayReset = DateTime(now.year, now.month, now.day, 4);
+    final currentDayBoundary = now.isBefore(todayReset)
+        ? todayReset.subtract(const Duration(days: 1))
+        : todayReset;
+
+    final meds = _repository.getAll();
+    bool changed = false;
+    for (final med in meds) {
+      if (med.depletedDate != null &&
+          med.remainingCount <= 0 &&
+          med.depletedDate!.isBefore(currentDayBoundary)) {
+        await _imageService.deleteImage(med.imagePath);
+        await _repository.delete(med.id);
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
 }
