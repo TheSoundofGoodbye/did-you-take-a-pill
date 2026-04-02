@@ -511,10 +511,17 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
 
     if (_isEditMode) {
       final totalCount = totalDays * _selectedDoseTimes.length;
+      // 비례 재조정: (기존 남은 비율) × (새 총량), totalCount 초과 방지
+      final oldTotal = widget.medication!.totalCount;
+      final oldRemaining = widget.medication!.remainingCount;
+      final newRemaining = oldTotal > 0
+          ? (oldRemaining * totalCount / oldTotal).round().clamp(0, totalCount)
+          : totalCount;
       final updated = widget.medication!.copyWith(
         name: name,
         totalDays: totalDays,
         totalCount: totalCount,
+        remainingCount: newRemaining,
         doseTimes: _selectedDoseTimes,
         imagePath: _selectedImagePath,
         clearImage: _selectedImagePath == null,

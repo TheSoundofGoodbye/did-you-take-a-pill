@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, kReleaseMode;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -52,10 +52,9 @@ class _MainDashboardState extends State<MainDashboard>
     if (kIsWeb) return; // 웹에서는 AdMob이 지원되지 않으므로 실행 방지
 
     _nativeAd = NativeAd(
-      // Android Test Native Advanced Ad Unit ID
-      // adUnitId: 'ca-app-pub-3940256099942544/2247696110',
-      // Android Real Native Advanced Ad Unit ID
-      adUnitId: 'ca-app-pub-7710267358364633/1212442339',
+      adUnitId: kReleaseMode
+          ? 'ca-app-pub-7710267358364633/1212442339' // Real Ad ID
+          : 'ca-app-pub-3940256099942544/2247696110', // Test Ad ID
       listener: NativeAdListener(
         onAdLoaded: (ad) {
           setState(() {
@@ -64,7 +63,7 @@ class _MainDashboardState extends State<MainDashboard>
         },
         onAdFailedToLoad: (ad, error) {
           ad.dispose();
-          print('Ad load failed: $error');
+          if (kDebugMode) debugPrint('Ad load failed: $error');
         },
       ),
       request: const AdRequest(),

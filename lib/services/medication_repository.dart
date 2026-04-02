@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:did_you_take_a_pill/models/medication.dart';
 import 'package:did_you_take_a_pill/models/dose_schedule.dart';
@@ -67,8 +68,11 @@ class MedicationRepository {
     return getAll().where((m) => m.shouldTakeAt(doseTime)).toList();
   }
 
-  /// ID 생성 유틸.
+  /// ID 생성 유틸 — 밀리초 + 랜덤 4자리로 충돌 방지.
   static String generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final rand = _random.nextInt(9999);
+    return '${now}_$rand';
   }
+  static final _random = Random();
 }
