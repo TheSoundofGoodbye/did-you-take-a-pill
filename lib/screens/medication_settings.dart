@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:did_you_take_a_pill/models/medication.dart';
@@ -511,12 +511,13 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
 
     if (_isEditMode) {
       final totalCount = totalDays * _selectedDoseTimes.length;
-      // 비례 재조정: (기존 남은 비율) × (새 총량), totalCount 초과 방지
-      final oldTotal = widget.medication!.totalCount;
-      final oldRemaining = widget.medication!.remainingCount;
-      final newRemaining = oldTotal > 0
-          ? (oldRemaining * totalCount / oldTotal).round().clamp(0, totalCount)
-          : totalCount;
+      // 일수 또는 복용시간대가 변경되면 → 남은 약도 새 총량으로 리셋
+      final daysChanged = totalDays != widget.medication!.totalDays;
+      final timesChanged = !listEquals(
+          _selectedDoseTimes, widget.medication!.doseTimes);
+      final newRemaining = (daysChanged || timesChanged)
+          ? totalCount
+          : widget.medication!.remainingCount;
       final updated = widget.medication!.copyWith(
         name: name,
         totalDays: totalDays,
@@ -525,6 +526,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
         doseTimes: _selectedDoseTimes,
         imagePath: _selectedImagePath,
         clearImage: _selectedImagePath == null,
+        clearDepletedDate: newRemaining > 0,
       );
       await provider.updateMedication(updated);
     } else {
