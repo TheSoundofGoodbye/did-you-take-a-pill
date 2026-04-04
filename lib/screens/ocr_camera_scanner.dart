@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:did_you_take_a_pill/l10n/app_localizations.dart';
 
 /// OCR 카메라 스캐너 화면 — 약봉지 촬영 → 텍스트 인식 → 갯수 추출.
 /// 현재는 스텁(stub) 구현. 추후 google_mlkit_text_recognition + image_picker 연동 예정.
@@ -7,12 +8,13 @@ class OcrCameraScanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
       appBar: AppBar(
-        title: const Text(
-          '약봉지 스캔',
-          style: TextStyle(
+        title: Text(
+          l10n.ocrScanTitle,
+          style: const TextStyle(
             fontWeight: FontWeight.w700,
             color: Colors.white,
           ),
@@ -48,7 +50,7 @@ class OcrCameraScanner extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               Text(
-                '준비 중',
+                l10n.ocrComingSoon,
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -57,7 +59,7 @@ class OcrCameraScanner extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '카메라 OCR 기능은\n다음 업데이트에서 만나요!',
+                l10n.ocrComingSoonDesc,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -82,9 +84,9 @@ class OcrCameraScanner extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Text(
-                  '돌아가기',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                child: Text(
+                  l10n.goBack,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ],

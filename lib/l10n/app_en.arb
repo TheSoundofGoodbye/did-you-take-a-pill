@@ -1,0 +1,69 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Did you take your pill?",
+  "medicationManage": "Manage",
+  "allTaken": "All taken ✓",
+  "tapMedication": "Tap your medication",
+  "noMedications": "No medications yet",
+  "registerMedication": "Add Medication",
+  "pill": "Pill",
+
+  "medicationSettings": "Settings",
+  "addMedication": "Add",
+  "editMedication": "Edit",
+  "maxMedicationsReached": "You can register up to 4 medications.",
+  "noMedicationsRegistered": "No medications registered",
+  "tapPlusToAdd": "Tap + below to add one",
+  "edit": "Edit",
+  "delete": "Delete",
+  "save": "Save",
+  "cancel": "Cancel",
+  "deleteMedication": "Delete Medication",
+  "deleteMedicationConfirm": "Delete '{name}'?",
+  "noName": "Unnamed",
+  "thisMedication": "this medication",
+
+  "remainingDays": "{remaining} / {total} days left",
+
+  "photoLabel": "Photo (optional)",
+  "nameLabel": "Name (optional if photo added)",
+  "nameHint": "e.g. Blood pressure med",
+  "nameOrPhotoRequired": "Please add a photo or name",
+  "prescriptionDaysLabel": "Prescription days",
+  "daysUnit": "d",
+  "daysSuffix": "{days} d",
+  "presetDays": "{days}d",
+  "whenToTake": "When do you take it?",
+  "selectAtLeastOneTime": "Select at least one time",
+
+  "photoRegistration": "Add Photo",
+  "takePhoto": "Take a photo",
+  "chooseFromGallery": "Choose from gallery",
+  "deletePhoto": "Remove photo",
+  "addPhotoByTouch": "Add photo  (tap)",
+  "touchToChange": "Tap to change",
+
+  "cropTitle": "Crop Photo",
+  "cropDone": "Done",
+  "cropCancel": "Cancel",
+
+  "ocrScanTitle": "Scan Pill Pack",
+  "ocrComingSoon": "Coming Soon",
+  "ocrComingSoonDesc": "Camera OCR scanning\nwill be available in the next update!",
+  "goBack": "Go Back",
+
+  "doseTimeWakeUp": "Wake-up meds",
+  "doseTimeMorning": "Morning meds",
+  "doseTimeAfternoon": "Lunch meds",
+  "doseTimeEvening": "Evening meds",
+  "doseTimeBedTime": "Bedtime meds",
+
+  "doseButtonWakeUp": "Wake-up",
+  "doseButtonMorning": "Morning",
+  "doseButtonAfternoon": "Lunch",
+  "doseButtonEvening": "Evening",
+  "doseButtonBedTime": "Bedtime",
+
+  "dateFormat": "EEEE, MMM d"
+}

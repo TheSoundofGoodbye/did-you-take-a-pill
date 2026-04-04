@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart';
+import 'package:did_you_take_a_pill/l10n/app_localizations.dart';
+
 /// 복용 시간대 구분.
 enum DoseTime {
   wakeUp,    // 일어나자마자 (공복)
@@ -8,34 +11,37 @@ enum DoseTime {
 }
 
 extension DoseTimeExtension on DoseTime {
-  String get displayName {
+  /// 화면에 표시할 시간대 이름 — 로컬라이즈.
+  String displayName(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     switch (this) {
       case DoseTime.wakeUp:
-        return '기상 후 약';
+        return l10n.doseTimeWakeUp;
       case DoseTime.morning:
-        return '아침약';
+        return l10n.doseTimeMorning;
       case DoseTime.afternoon:
-        return '점심약';
+        return l10n.doseTimeAfternoon;
       case DoseTime.evening:
-        return '저녁약';
+        return l10n.doseTimeEvening;
       case DoseTime.bedTime:
-        return '취침 전 약';
+        return l10n.doseTimeBedTime;
     }
   }
 
-  /// 버튼에 표시될 짧은 레이블
-  String get buttonLabel {
+  /// 버튼에 표시될 짧은 레이블 — 로컬라이즈.
+  String buttonLabel(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     switch (this) {
       case DoseTime.wakeUp:
-        return '일어나자마자';
+        return l10n.doseButtonWakeUp;
       case DoseTime.morning:
-        return '아침';
+        return l10n.doseButtonMorning;
       case DoseTime.afternoon:
-        return '점심';
+        return l10n.doseButtonAfternoon;
       case DoseTime.evening:
-        return '저녁';
+        return l10n.doseButtonEvening;
       case DoseTime.bedTime:
-        return '자기전';
+        return l10n.doseButtonBedTime;
     }
   }
 
@@ -66,6 +72,6 @@ extension DoseTimeExtension on DoseTime {
 }
 
 /// DoseTime 리스트의 표시 이름 생성 유틸.
-String doseTimesDisplayName(List<DoseTime> doseTimes) {
-  return doseTimes.map((dt) => dt.displayName).join(', ');
+String doseTimesDisplayName(BuildContext context, List<DoseTime> doseTimes) {
+  return doseTimes.map((dt) => dt.displayName(context)).join(', ');
 }

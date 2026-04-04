@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:did_you_take_a_pill/l10n/app_localizations.dart';
 import 'package:did_you_take_a_pill/models/medication.dart';
 import 'package:did_you_take_a_pill/models/dose_schedule.dart';
 import 'package:did_you_take_a_pill/providers/medication_provider.dart';
@@ -19,9 +20,9 @@ class MedicationSettings extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
       appBar: AppBar(
-        title: const Text(
-          '약 설정',
-          style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+        title: Text(
+          AppLocalizations.of(context)!.medicationSettings,
+          style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -44,9 +45,9 @@ class MedicationSettings extends StatelessWidget {
               elevation: 0,
             ),
             icon: const Icon(Icons.add, size: 26),
-            label: const Text(
-              '약 추가',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            label: Text(
+              AppLocalizations.of(context)!.addMedication,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -63,13 +64,13 @@ class MedicationSettings extends StatelessWidget {
                   Icon(Icons.medication_liquid_rounded,
                       size: 80, color: Colors.white.withValues(alpha: 0.15)),
                   const SizedBox(height: 20),
-                  Text('등록된 약이 없습니다',
+                  Text(AppLocalizations.of(context)!.noMedicationsRegistered,
                       style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w600,
                           color: Colors.white.withValues(alpha: 0.5))),
                   const SizedBox(height: 10),
-                  Text('아래 + 버튼을 눌러 추가하세요',
+                  Text(AppLocalizations.of(context)!.tapPlusToAdd,
                       style: TextStyle(
                           fontSize: 18,
                           color: Colors.white.withValues(alpha: 0.35))),
@@ -93,10 +94,10 @@ class MedicationSettings extends StatelessWidget {
     final medCount = context.read<MedicationProvider>().medications.length;
     if (medCount >= 4) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('약은 최대 4개까지 등록할 수 있습니다.',
-              style: TextStyle(fontSize: 16)),
-          backgroundColor: Color(0xFFFF6B6B),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.maxMedicationsReached,
+              style: const TextStyle(fontSize: 16)),
+          backgroundColor: const Color(0xFFFF6B6B),
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 2),
         ),
@@ -149,7 +150,7 @@ class _MedicationCard extends StatelessWidget {
                       Text(
                           medication.name.isNotEmpty
                               ? medication.name
-                              : '약 (이름 없음)',
+                              : AppLocalizations.of(context)!.noName,
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
@@ -160,13 +161,13 @@ class _MedicationCard extends StatelessWidget {
                         runSpacing: 6,
                         children: [
                           _infoChip(
-                            '남은 ${medication.remainingDays}일 / ${medication.totalDays}일분',
+                            AppLocalizations.of(context)!.remainingDays(medication.remainingDays, medication.totalDays),
                             medication.remainingDays <= 3
                                 ? const Color(0xFFFF6B6B)
                                 : const Color(0xFF4ECDC4),
                           ),
                           _infoChip(
-                            doseTimesDisplayName(medication.doseTimes),
+                            doseTimesDisplayName(context, medication.doseTimes),
                             const Color(0xFF7C83FD),
                           ),
                         ],
@@ -190,8 +191,8 @@ class _MedicationCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text('수정',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    child: Text(AppLocalizations.of(context)!.edit,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -207,7 +208,7 @@ class _MedicationCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text('삭제',
+                    child: Text(AppLocalizations.of(context)!.delete,
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   ),
                 ),
@@ -280,22 +281,23 @@ class _MedicationCard extends StatelessWidget {
   }
 
   void _confirmDelete(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final displayName =
-        medication.name.isNotEmpty ? medication.name : '이 약';
+        medication.name.isNotEmpty ? medication.name : l10n.thisMedication;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A2E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('약 삭제',
+        title: Text(l10n.deleteMedication,
             style:
-                TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-        content: Text('\'$displayName\'을(를) 삭제하시겠습니까?',
+                const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: Text(l10n.deleteMedicationConfirm(displayName),
             style: TextStyle(color: Colors.white.withValues(alpha: 0.6))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('취소',
+            child: Text(l10n.cancel,
                 style:
                     TextStyle(color: Colors.white.withValues(alpha: 0.5))),
           ),
@@ -306,8 +308,8 @@ class _MedicationCard extends StatelessWidget {
                   .removeMedication(medication.id);
               Navigator.pop(ctx);
             },
-            child: const Text('삭제',
-                style: TextStyle(color: Color(0xFFFF6B6B))),
+            child: Text(l10n.delete,
+                style: const TextStyle(color: Color(0xFFFF6B6B))),
           ),
         ],
       ),
@@ -417,15 +419,15 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text('사진 등록 방법',
-                  style: TextStyle(
+              Text(AppLocalizations.of(context)!.photoRegistration,
+                  style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: Colors.white)),
               const SizedBox(height: 16),
               _buildSourceOption(
                 icon: Icons.camera_alt_rounded,
-                label: '카메라로 촬영',
+                label: AppLocalizations.of(context)!.takePhoto,
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickImage(ImageSource.camera);
@@ -434,7 +436,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
               const SizedBox(height: 8),
               _buildSourceOption(
                 icon: Icons.photo_library_rounded,
-                label: '갤러리에서 선택',
+                label: AppLocalizations.of(context)!.chooseFromGallery,
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickImage(ImageSource.gallery);
@@ -444,7 +446,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
                 const SizedBox(height: 8),
                 _buildSourceOption(
                   icon: Icons.delete_outline_rounded,
-                  label: '사진 삭제',
+                  label: AppLocalizations.of(context)!.deletePhoto,
                   color: const Color(0xFFFF6B6B),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -563,7 +565,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            Text(_isEditMode ? '약 수정' : '약 추가',
+            Text(_isEditMode ? AppLocalizations.of(context)!.editMedication : AppLocalizations.of(context)!.addMedication,
                 style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -571,33 +573,33 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
             const SizedBox(height: 12),
 
             // ── 사진 등록 영역 ──
-            _buildLabel('약 사진 (선택)'),
+            _buildLabel(AppLocalizations.of(context)!.photoLabel),
             const SizedBox(height: 6),
             _buildImagePicker(),
             const SizedBox(height: 12),
 
             // 약 이름 (optional - 사진이 있으면 생략 가능)
-            _buildLabel('약 이름 (사진이 있으면 생략 가능)'),
+            _buildLabel(AppLocalizations.of(context)!.nameLabel),
             const SizedBox(height: 6),
             _buildValidatedTextField(
               controller: _nameController,
-              hint: '예: 고혈압약',
+              hint: AppLocalizations.of(context)!.nameHint,
               key: 'medication_name_input',
               hasError: _showValidationErrors && !_hasNameOrImage,
-              errorText: '사진 또는 이름을 입력하세요',
+              errorText: AppLocalizations.of(context)!.nameOrPhotoRequired,
             ),
             const SizedBox(height: 12),
 
             // 처방 일수
-            _buildLabel('처방 일수 (며칠 치 약인가요?)'),
+            _buildLabel(AppLocalizations.of(context)!.prescriptionDaysLabel),
             const SizedBox(height: 8),
             _buildDaysSelector(),
             const SizedBox(height: 12),
 
             // 언제 드시는 약인가요? (5개 버튼)
-            const Text(
-              '언제 드시는 약인가요?',
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context)!.whenToTake,
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -606,7 +608,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
             if (_showValidationErrors && !_hasTime)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text('복용 시기를 하나 이상 선택하세요',
+                child: Text(AppLocalizations.of(context)!.selectAtLeastOneTime,
                     style: TextStyle(
                         fontSize: 14,
                         color: const Color(0xFFFF6B6B).withValues(alpha: 0.9))),
@@ -638,7 +640,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
                           width: 1.5),
                 ),
               ),
-              child: Text(_isEditMode ? '수정' : '저장',
+              child: Text(_isEditMode ? AppLocalizations.of(context)!.edit : AppLocalizations.of(context)!.save,
                   style: const TextStyle(
                       fontSize: 22, fontWeight: FontWeight.w800)),
             ),
@@ -684,7 +686,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
         Icon(Icons.add_a_photo_rounded,
             size: 40, color: Colors.white.withValues(alpha: 0.55)),
         const SizedBox(height: 10),
-        Text('사진으로 등록  (터치)',
+        Text(AppLocalizations.of(context)!.addPhotoByTouch,
             style: TextStyle(
                 fontSize: 17,
                 color: Colors.white.withValues(alpha: 0.75),
@@ -722,12 +724,12 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
                 ],
               ),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.edit_rounded, color: Colors.white70, size: 18),
                 SizedBox(width: 6),
-                Text('터치하여 변경',
+                Text(AppLocalizations.of(context)!.touchToChange,
                     style: TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
@@ -762,7 +764,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
               width: 1.5,
             ),
           ),
-          child: Text('$days일',
+          child: Text(AppLocalizations.of(context)!.presetDays(days),
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
@@ -801,7 +803,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
                 alignment: Alignment.center,
                 width: 70,
                 child: Text(
-                  '$_prescriptionDays 일',
+                  AppLocalizations.of(context)!.daysSuffix(_prescriptionDays),
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
@@ -897,7 +899,7 @@ class _MedicationFormSheetState extends State<_MedicationFormSheet> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  dt.buttonLabel,
+                  dt.buttonLabel(context),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,

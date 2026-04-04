@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:did_you_take_a_pill/l10n/app_localizations.dart';
 
 /// 약 사진 선택 → 크롭 → 앱 내부 저장을 담당하는 서비스.
 /// 의학적 해석 없이 이미지 파일 경로(String)만 반환.
@@ -26,12 +27,14 @@ class ImageStorageService {
     // 웹에서는 크롭 생략 → 바로 경로 반환
     if (kIsWeb) return picked.path;
 
+    final l10n = AppLocalizations.of(context)!;
+
     // 네이티브: 크롭 화면 진입
     final croppedFile = await ImageCropper().cropImage(
       sourcePath: picked.path,
       uiSettings: [
         AndroidUiSettings(
-          toolbarTitle: '사진 자르기',
+          toolbarTitle: l10n.cropTitle,
           toolbarColor: const Color(0xFF1A1A2E),
           toolbarWidgetColor: Colors.white,
           backgroundColor: const Color(0xFF0F0F1A),
@@ -41,9 +44,9 @@ class ImageStorageService {
           hideBottomControls: false,
         ),
         IOSUiSettings(
-          title: '사진 자르기',
-          doneButtonTitle: '완료',
-          cancelButtonTitle: '취소',
+          title: l10n.cropTitle,
+          doneButtonTitle: l10n.cropDone,
+          cancelButtonTitle: l10n.cropCancel,
         ),
       ],
     );

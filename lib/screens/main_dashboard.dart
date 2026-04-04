@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, kReleaseMode;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:did_you_take_a_pill/l10n/app_localizations.dart';
 import 'package:did_you_take_a_pill/models/dose_schedule.dart';
 import 'package:did_you_take_a_pill/models/medication.dart';
 import 'package:did_you_take_a_pill/providers/medication_provider.dart';
@@ -150,10 +151,21 @@ class _MainDashboardState extends State<MainDashboard>
 
   void _updateClock() {
     final now = DateTime.now();
+    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    final localeTag = locale.toLanguageTag();
     setState(() {
       _time = DateFormat('HH:mm').format(now);
-      _date = DateFormat('M월 d일 EEEE', 'ko_KR').format(now);
+      _date = DateFormat(
+        _dateFormatPattern(localeTag),
+        localeTag,
+      ).format(now);
     });
+  }
+
+  /// 날짜 포맷 패턴을 로케일에 따라 결정.
+  String _dateFormatPattern(String localeTag) {
+    if (localeTag.startsWith('ko')) return 'M월 d일 EEEE';
+    return 'EEEE, MMM d';
   }
 
   @override
@@ -257,9 +269,9 @@ class _MainDashboardState extends State<MainDashboard>
                             elevation: 0,
                           ),
                           icon: const Icon(Icons.settings_rounded, size: 24),
-                          label: const Text(
-                            '약 관리',
-                            style: TextStyle(
+                          label: Text(
+                            AppLocalizations.of(context)!.medicationManage,
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
                             ),
@@ -281,9 +293,9 @@ class _MainDashboardState extends State<MainDashboard>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          const Text(
-            '오늘 약 드셨나요?',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context)!.appTitle,
+            style: const TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 24,
               color: Colors.white,
@@ -477,7 +489,7 @@ class _MainDashboardState extends State<MainDashboard>
       children: [
         // 시간대 라벨 (어르신들에게 정확한 시간 표시는 혼란을 줄 수 있으므로 제거)
         Text(
-          doseTime.displayName,
+          doseTime.displayName(context),
           style: TextStyle(
             fontSize: 34,
             fontWeight: FontWeight.w800,
@@ -538,7 +550,7 @@ class _MainDashboardState extends State<MainDashboard>
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: Text(
-                allTaken ? '복약 완료 ✓' : '약을 터치해주세요',
+                allTaken ? AppLocalizations.of(context)!.allTaken : AppLocalizations.of(context)!.tapMedication,
                 key: ValueKey(allTaken),
                 style: TextStyle(
                   fontSize: 18,
@@ -685,7 +697,7 @@ class _MainDashboardState extends State<MainDashboard>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: Text(
-                    med.name.isNotEmpty ? med.name : '약',
+                    med.name.isNotEmpty ? med.name : AppLocalizations.of(context)!.pill,
                     style: TextStyle(
                       fontSize: nameSize,
                       color: taken
@@ -834,7 +846,7 @@ class _MainDashboardState extends State<MainDashboard>
           ),
           const SizedBox(height: 28),
           Text(
-            '등록된 약이 없어요',
+            AppLocalizations.of(context)!.noMedications,
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w600,
@@ -856,9 +868,9 @@ class _MainDashboardState extends State<MainDashboard>
                 elevation: 0,
               ),
               icon: const Icon(Icons.add_circle_outline, size: 28),
-              label: const Text(
-                '약 등록하기',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              label: Text(
+                AppLocalizations.of(context)!.registerMedication,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
               ),
             ),
           ),

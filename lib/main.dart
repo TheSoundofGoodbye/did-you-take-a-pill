@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:did_you_take_a_pill/l10n/app_localizations.dart';
 import 'package:did_you_take_a_pill/providers/medication_provider.dart';
 import 'package:did_you_take_a_pill/services/medication_repository.dart';
 import 'package:did_you_take_a_pill/services/daily_check_in_service.dart';
@@ -16,6 +18,7 @@ void main() async {
     await MobileAds.instance.initialize();
   }
   await initializeDateFormatting('ko_KR', null);
+  await initializeDateFormatting('en_US', null);
   final prefs = await SharedPreferences.getInstance();
   final repository = MedicationRepository(prefs);
 
@@ -37,8 +40,19 @@ class MedicationTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '오늘 약 드셨나요?',
+      title: '약 드셨나요?',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ko'),
+        Locale('en'),
+      ],
+      locale: null, // 기기 설정 따름
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0F0F1A),

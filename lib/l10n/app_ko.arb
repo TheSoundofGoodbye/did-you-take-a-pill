@@ -1,0 +1,81 @@
+{
+  "@@locale": "ko",
+
+  "appTitle": "오늘 약 드셨나요?",
+  "medicationManage": "약 관리",
+  "allTaken": "복약 완료 ✓",
+  "tapMedication": "약을 터치해주세요",
+  "noMedications": "등록된 약이 없어요",
+  "registerMedication": "약 등록하기",
+  "pill": "약",
+
+  "medicationSettings": "약 설정",
+  "addMedication": "약 추가",
+  "editMedication": "약 수정",
+  "maxMedicationsReached": "약은 최대 4개까지 등록할 수 있습니다.",
+  "noMedicationsRegistered": "등록된 약이 없습니다",
+  "tapPlusToAdd": "아래 + 버튼을 눌러 추가하세요",
+  "edit": "수정",
+  "delete": "삭제",
+  "save": "저장",
+  "cancel": "취소",
+  "deleteMedication": "약 삭제",
+  "deleteMedicationConfirm": "'{name}'을(를) 삭제하시겠습니까?",
+  "@deleteMedicationConfirm": {
+    "placeholders": { "name": {} }
+  },
+  "noName": "약 (이름 없음)",
+  "thisMedication": "이 약",
+
+  "remainingDays": "남은 {remaining}일 / {total}일분",
+  "@remainingDays": {
+    "placeholders": { "remaining": {}, "total": {} }
+  },
+
+  "photoLabel": "약 사진 (선택)",
+  "nameLabel": "약 이름 (사진이 있으면 생략 가능)",
+  "nameHint": "예: 고혈압약",
+  "nameOrPhotoRequired": "사진 또는 이름을 입력하세요",
+  "prescriptionDaysLabel": "처방 일수 (며칠 치 약인가요?)",
+  "daysUnit": "일",
+  "daysSuffix": "{days} 일",
+  "@daysSuffix": {
+    "placeholders": { "days": {} }
+  },
+  "presetDays": "{days}일",
+  "@presetDays": {
+    "placeholders": { "days": {} }
+  },
+  "whenToTake": "언제 드시는 약인가요?",
+  "selectAtLeastOneTime": "복용 시기를 하나 이상 선택하세요",
+
+  "photoRegistration": "사진 등록 방법",
+  "takePhoto": "카메라로 촬영",
+  "chooseFromGallery": "갤러리에서 선택",
+  "deletePhoto": "사진 삭제",
+  "addPhotoByTouch": "사진으로 등록  (터치)",
+  "touchToChange": "터치하여 변경",
+
+  "cropTitle": "사진 자르기",
+  "cropDone": "완료",
+  "cropCancel": "취소",
+
+  "ocrScanTitle": "약봉지 스캔",
+  "ocrComingSoon": "준비 중",
+  "ocrComingSoonDesc": "카메라 OCR 기능은\n다음 업데이트에서 만나요!",
+  "goBack": "돌아가기",
+
+  "doseTimeWakeUp": "기상 후 약",
+  "doseTimeMorning": "아침약",
+  "doseTimeAfternoon": "점심약",
+  "doseTimeEvening": "저녁약",
+  "doseTimeBedTime": "취침 전 약",
+
+  "doseButtonWakeUp": "일어나자마자",
+  "doseButtonMorning": "아침",
+  "doseButtonAfternoon": "점심",
+  "doseButtonEvening": "저녁",
+  "doseButtonBedTime": "자기전",
+
+  "dateFormat": "M월 d일 EEEE"
+}
