@@ -40,7 +40,7 @@ class MedicationTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '약 드셨나요?',
+      onGenerateTitle: (context) => AppLocalizations.of(context)?.appTitle ?? '약 드셨나요?',
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
         AppLocalizations.delegate,
