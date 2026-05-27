@@ -39,13 +39,13 @@
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
 
         <!-- AdMob Test App ID -->
-        <!-- <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/> -->
-        <!-- AdMob App ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-7710267358364633~5659220703"/>
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
+        <!-- AdMob App ID (production - commented out for testing) -->
+        <!-- <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-7710267358364633~5659220703"/> -->
 
 
     </application>

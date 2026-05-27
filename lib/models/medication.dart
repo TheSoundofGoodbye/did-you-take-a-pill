@@ -24,13 +24,17 @@ class Medication {
     this.depletedDate,
   });
 
-  /// 남은 일수 계산 (내림 — 완전히 복용 가능한 일수만 표시).
+  /// 남은 일수 계산.
+  /// 처방일수(totalDays)에서 소비된 일수를 뺀다.
+  /// 소비 일수 = 소비된 알약 수 / 하루 복용 횟수 (올림).
   int get remainingDays {
     if (doseTimes.isEmpty) return 0;
-    // floor(): 아침+저녁 중 한 번만 남아도 '1일' 되는 왜곡 방지
-    // 단, 알약이 남아있으면 최소 1일은 보장 (0으로 떨어지기 전까지)
-    final days = (remainingCount / doseTimes.length).floor();
-    return (remainingCount > 0 && days == 0) ? 1 : days;
+    final consumed = totalCount - remainingCount;
+    final consumedDays = (consumed / doseTimes.length).ceil();
+    final days = totalDays - consumedDays;
+    // 알약이 남아있으면 최소 1일은 보장
+    if (remainingCount > 0 && days <= 0) return 1;
+    return days < 0 ? 0 : days;
   }
 
   /// imagePath를 명시적으로 null로 설정하려면 clearImage: true 사용.

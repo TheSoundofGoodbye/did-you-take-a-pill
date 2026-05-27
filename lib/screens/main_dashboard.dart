@@ -53,9 +53,9 @@ class _MainDashboardState extends State<MainDashboard>
     if (kIsWeb) return; // 웹에서는 AdMob이 지원되지 않으므로 실행 방지
 
     _nativeAd = NativeAd(
-      adUnitId: kReleaseMode
-          ? 'ca-app-pub-7710267358364633/1212442339' // Real Ad ID
-          : 'ca-app-pub-3940256099942544/2247696110', // Test Ad ID
+      // TODO: 프로덕션 배포 시 실제 ID로 복원
+      // Real Ad ID: 'ca-app-pub-7710267358364633/1212442339'
+      adUnitId: 'ca-app-pub-3940256099942544/2247696110', // Test Ad ID
       listener: NativeAdListener(
         onAdLoaded: (ad) {
           setState(() {
